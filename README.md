@@ -11,7 +11,8 @@ Approved plan: [`PLAN.md`](PLAN.md).
 dg-app/
 ├── PLAN.md               approved build plan
 ├── DEPLOY_LOCAL.md       isolated Linux folder (/opt/dgapp-test), loopback, no public DNS
-├── TEST_FLOW.md          signup → stub Stripe → buy a fake 555 number
+├── TESTING.md            local signup → stub Stripe → buy a fake 555 number
+├── TEST_FLOW.md          the same path as curl, plus the seed command
 ├── GO_LIVE_CHECKLIST.md  repo-ready items vs what Umar still has to provide
 ├── .env.example          Compose placeholders (loopback binds, Stripe test-key placeholders)
 ├── docker-compose.yml    dedicated machine: postgres + api + web (loopback ports, health checks)
@@ -111,7 +112,7 @@ accounts + Firebase (Phase 2) · SIPNAV "DG App" account, tech prefix, attestati
 
 ## DID pool (Phase 1 ops)
 Numbers are sold from `did_pool`. Importing is a **DB-only** change; it never calls SIPNAV. Before importing a real block,
-it must already be assigned to the "DG App" SIPNAV account and routed to the edge. Click-through with the Stripe stub: [`TEST_FLOW.md`](TEST_FLOW.md).
+it must already be assigned to the "DG App" SIPNAV account and routed to the edge. Local click-through (ports, tunnel, stub Stripe, what has no audio yet): [`TESTING.md`](TESTING.md). Curl transcript: [`TEST_FLOW.md`](TEST_FLOW.md).
 - CSV: `cd backend && npm run seed -- seed/pool.example.csv` (prod image: `npm run seed:prod -- /path/pool.csv`).
   Required header: `E.164,country,monthly_price_cents` (`500` = $5.00). `monthly_usd` still works. Optional: `region`, `number_type`, `setup_price_cents` or `setup_usd`, `sipnav_ref`.
   `seed/pool.example.csv` is fictional 555 numbers, **not** inventory. Re-import updates price and region, and does not change status.

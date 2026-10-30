@@ -87,6 +87,8 @@ npm ci
 npm run dev
 ```
 
+The signup → stub payment → buy-a-number script, and what still has no audio, is [`TESTING.md`](TESTING.md).
+
 Vite listens on `127.0.0.1:4200` and proxies `/v1` to `127.0.0.1:4100`. From a laptop:
 
 ```bash

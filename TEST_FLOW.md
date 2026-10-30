@@ -25,7 +25,7 @@ Docker image, from the repo root:
 docker compose exec api npm run seed:prod -- seed/pool.example.csv
 ```
 
-Expected log: `pool import: 3 inserted, 0 updated` the first time, then `0 inserted, 3 updated` if you run it again. Prices refresh. Status of a number that is already assigned does not change. The command never calls SIPNAV.
+Expected log: `pool import: 8 inserted, 0 updated` the first time, then `0 inserted, 8 updated` if you run it again. Prices refresh. Status of a number that is already assigned does not change. The command never calls SIPNAV. The short local procedure (ports, tunnel, and what cannot work yet) is [`TESTING.md`](TESTING.md).
 
 When the team sends the real block (same columns: `E.164`, `country`, `monthly_price_cents`):
 

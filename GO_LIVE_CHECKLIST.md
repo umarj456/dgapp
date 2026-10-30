@@ -32,7 +32,7 @@ A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set t
 ## Still required before real traffic (Umar)
 
 - [ ] SIPNAV wholesale account named for DG App: one IP-authenticated endpoint, tech prefix (replace placeholder `05436#`), attestation, and the carriers to use.
-- [ ] A real DID block assigned to that account and routed to the edge. Import with `cd backend && npm run seed -- /path/to/sipnav-dgapp.csv` (header `E.164,country,monthly_price_cents`). The `555` sample is not inventory. Stub signup path: `TEST_FLOW.md`.
+- [ ] A real DID block assigned to that account and routed to the edge. Import with `cd backend && npm run seed -- /path/to/sipnav-dgapp.csv` (header `E.164,country,monthly_price_cents`). The `555` sample is not inventory. Local stub test: `TESTING.md`.
 - [ ] Approved retail rates and monthly number prices (migration `003` values are placeholders).
 - [ ] Launch countries and the first pool size.
 - [ ] Stripe account. Deliver `sk_live_` / `sk_test_`, `whsec_`, and `pk_live_` / `pk_test_` out of band. Set `STRIPE_STUB_MODE=false` only with those keys, and only with `NODE_ENV=production` once OTP is real too.

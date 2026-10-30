@@ -19,7 +19,12 @@ describe('parsePoolCsv', () => {
     const text = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../seed/pool.example.csv'), 'utf8');
     expect(text).toMatch(/NOT real inventory/);
     const rows = parsePoolCsv(text);
-    expect(rows.map((r) => r.e164)).toEqual(['12125550121', '13105550122', '17135550123']);
+    expect(rows.map((r) => r.e164)).toEqual([
+      '12125550121', '13105550122', '17135550123', '14155550124',
+      '13055550125', '16175550126', '12065550127', '13125550128',
+    ]);
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    expect(rows.length).toBeLessThanOrEqual(10);
     expect(rows.every((r) => r.e164.includes('555') && r.country === 'US' && r.monthlyPriceMicros === 5_000_000)).toBe(true);
     expect(() => parsePoolCsv('e164,country,monthly_price_cents,monthly_usd\n12125550121,US,500,6.00')).toThrow(/disagree/);
   });
