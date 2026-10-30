@@ -1,0 +1,4 @@
+# FAKE numbers (555-01xx fictional range). Replace with the real DG App block from SIPNAV.
+e164,country,region,number_type,monthly_usd,setup_usd,sipnav_ref
+12125550111,US,NY-212,local,5.00,0,
+13105550112,US,CA-310,local,5.00,0,

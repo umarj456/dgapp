@@ -104,3 +104,18 @@ Stub mode is refused when `NODE_ENV=production` (as are the console OTP provider
 Launch countries · first DID pool size · retail rates + number prices (placeholders in migration 003) · edge/API server ·
 Stripe account · OTP/SMS provider for codes · KYC vendor for ID/address (or manual review) · Apple/Google developer
 accounts + Firebase (Phase 2) · SIPNAV "DG App" account, tech prefix, attestation.
+
+## DID pool (Phase 1 ops)
+Numbers are sold from `did_pool`. Importing is a **DB-only** change; it never calls SIPNAV. Before importing,
+the block must already be assigned to the "DG App" SIPNAV account and routed to the edge.
+- CSV: `cd backend && npm run seed -- seed/pool.example.csv` (prod image: `npm run seed:prod -- /path/pool.csv`).
+  Header: `e164,country,region,number_type,monthly_usd,setup_usd,sipnav_ref`. Re-import updates price/region, never status.
+- Internal API (edge/ops network only, bearer `INTERNAL_API_TOKEN` + IP allow-list):
+  - `GET  /internal/v1/dids/pool` counts by country/status
+  - `POST /internal/v1/dids/pool/import` `{ "numbers": [{ "e164", "country", "region?", "numberType?", "monthlyPriceMicros", "setupPriceMicros?", "sipnavRef?" }] }`
+  - `POST /internal/v1/dids/pool/:e164/status` `{ "status": "disabled" | "available" }` (refused for assigned numbers)
+
+## Tests
+`cd backend && npm test` runs unit tests. With a throwaway Postgres, `TEST_DATABASE_URL=postgres://... npm test`
+also runs the end-to-end flow (sign-up, KYC gate, top-up, buy DID, prepaid call hold/settle, fraud, inbound, pool admin).
+**That database is wiped.** CI workflow is staged at `docs/ci.workflow.yml`; copy it to `.github/workflows/ci.yml` from the GitHub UI (the bot token lacks `workflow` scope).
