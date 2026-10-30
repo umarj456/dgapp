@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/lib/api.ts","./src/lib/phone.ts","./src/screens/Dialer.tsx","./src/screens/IncomingCall.tsx","./src/screens/Numbers.tsx","./src/screens/SignUp.tsx","./src/screens/Verify.tsx","./src/screens/Wallet.tsx","./vite.config.ts"],"version":"5.9.3"}

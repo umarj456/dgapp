@@ -1,0 +1,51 @@
+-- Reference data. PLACEHOLDER values: retail pricing and launch countries are pending Umar's decision.
+INSERT INTO did_country_requirements (country, requires_id, requires_address, address_must_be_local, notes) VALUES
+  ('US', false, false, false, 'Local US numbers: email+phone+payment minimum'),
+  ('CA', false, false, false, 'Placeholder'),
+  ('GB', false, true,  false, 'Placeholder: UK geographic numbers usually need an address'),
+  ('DE', true,  true,  true,  'Placeholder: German geographic numbers need local address + ID')
+ON CONFLICT (country) DO NOTHING;
+
+-- IRSF / premium / high-fraud prefixes (starter list, review before launch).
+INSERT INTO destination_blocklist (prefix, reason) VALUES
+  ('1900', 'US premium rate'),
+  ('1976', 'US premium rate'),
+  ('1242', 'Bahamas: NANP IRSF hotspot'),
+  ('1246', 'Barbados: NANP IRSF hotspot'),
+  ('1264', 'Anguilla: NANP IRSF hotspot'),
+  ('1268', 'Antigua: NANP IRSF hotspot'),
+  ('1284', 'BVI: NANP IRSF hotspot'),
+  ('1345', 'Cayman: NANP IRSF hotspot'),
+  ('1441', 'Bermuda: NANP IRSF hotspot'),
+  ('1473', 'Grenada: NANP IRSF hotspot'),
+  ('1649', 'Turks & Caicos: NANP IRSF hotspot'),
+  ('1664', 'Montserrat: NANP IRSF hotspot'),
+  ('1767', 'Dominica: NANP IRSF hotspot'),
+  ('1809', 'Dominican Rep.: NANP IRSF hotspot'),
+  ('1829', 'Dominican Rep.: NANP IRSF hotspot'),
+  ('1849', 'Dominican Rep.: NANP IRSF hotspot'),
+  ('1876', 'Jamaica: NANP IRSF hotspot'),
+  ('1868', 'Trinidad: NANP IRSF hotspot'),
+  ('1869', 'St Kitts: NANP IRSF hotspot'),
+  ('1758', 'St Lucia: NANP IRSF hotspot'),
+  ('1784', 'St Vincent: NANP IRSF hotspot'),
+  ('881',  'Global mobile satellite'),
+  ('882',  'International networks'),
+  ('883',  'International networks'),
+  ('870',  'Inmarsat'),
+  ('979',  'International premium rate'),
+  ('239',  'Sao Tome: IRSF'),
+  ('247',  'Ascension: IRSF'),
+  ('290',  'St Helena: IRSF'),
+  ('677',  'Solomon Is.: IRSF'),
+  ('678',  'Vanuatu: IRSF'),
+  ('682',  'Cook Is.: IRSF'),
+  ('683',  'Niue: IRSF'),
+  ('686',  'Kiribati: IRSF'),
+  ('688',  'Tuvalu: IRSF'),
+  ('690',  'Tokelau: IRSF'),
+  ('371',  'Latvia premium ranges: review'),
+  ('252',  'Somalia: IRSF'),
+  ('225',  'Cote d''Ivoire: IRSF'),
+  ('232',  'Sierra Leone: IRSF')
+ON CONFLICT (prefix) DO NOTHING;

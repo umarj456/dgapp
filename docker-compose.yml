@@ -1,0 +1,34 @@
+# Local development only. No real credentials: everything here is a dev placeholder.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dgapp
+      POSTGRES_PASSWORD: dgapp
+      POSTGRES_DB: dgapp
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dgapp"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://dgapp:dgapp@postgres:5432/dgapp
+      MIGRATE_DEV_SEED: "true"          # loads fake 555-01xx DIDs + placeholder rates
+      OTP_PROVIDER: console             # OTP codes are printed in `docker compose logs api`
+      STRIPE_STUB_MODE: "true"
+      INTERNAL_API_TOKEN: change-me-dev-only
+      INTERNAL_ALLOWED_IPS: 127.0.0.1,::1,::ffff:127.0.0.1
+      SIPNAV_TECH_PREFIX: "05436#"
+      SIP_REALM: sip.dialergiants.example
+      WEB_ORIGIN: http://localhost:5173
+    ports: ["8080:8080"]
+
+volumes:
+  pgdata:

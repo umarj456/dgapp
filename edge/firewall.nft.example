@@ -1,0 +1,13 @@
+# nftables sketch for the edge (apply only after approval). SIP/UDP only from SIPNAV; WSS from anywhere.
+table inet dgedge {
+  chain input {
+    type filter hook input priority 0; policy drop;
+    ct state established,related accept
+    iif lo accept
+    tcp dport 22 ip saddr { ADMIN_IP } accept
+    tcp dport { 80, 443, 8443 } accept                 # certbot + WSS
+    udp dport 5060 ip saddr { SIPNAV_IP } accept       # signalling from SIPNAV only
+    udp dport 30000-40000 accept                       # RTP / SRTP media
+    ip protocol icmp accept
+  }
+}

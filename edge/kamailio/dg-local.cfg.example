@@ -1,0 +1,12 @@
+# Copy to /etc/kamailio/dg-local.cfg on the edge server (chmod 640, owner kamailio). NOT in git.
+# All values are PLACEHOLDERS until Umar approves the server and the SIPNAV "DG App" account.
+#!substdef "!EDGE_PUBLIC_IP!203.0.113.10!g"
+#!substdef "!EDGE_PRIVATE_IP!10.0.0.10!g"
+#!substdef "!SIP_DOMAIN!sip.dialergiants.com!g"
+# SIPNAV signalling IP that sends inbound DIDs / receives our outbound (from SIPNAV endpoint page)
+#!substdef "!SIPNAV_IP!198.51.100.20!g"
+#!substdef "!SIPNAV_PORT!5060!g"
+# DG App API over the private network
+#!substdef "!API_URL!http://10.0.0.2:8080!g"
+# Same value as INTERNAL_API_TOKEN in the API .env
+#!substdef "!API_TOKEN!REPLACE_WITH_INTERNAL_API_TOKEN!g"

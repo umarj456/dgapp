@@ -1,0 +1,18 @@
+:root { font-family: system-ui, sans-serif; color: #111; background: #f5f6f8; }
+body { margin: 0; }
+.app { max-width: 440px; margin: 0 auto; padding: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 0; }
+input, select, button { font-size: 16px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin: 4px 0; }
+button { background: #0b5fff; color: #fff; border: none; cursor: pointer; }
+button.secondary { background: #e8ecf5; color: #111; }
+button.danger { background: #d92d20; }
+button:disabled { opacity: .5; }
+.row { display: flex; gap: 8px; } .row > * { flex: 1; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.keypad button { font-size: 22px; padding: 14px; background: #eef1f7; color: #111; }
+.ok { color: #067647; } .bad { color: #b42318; } .muted { color: #667085; font-size: 13px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; } .tabs button { padding: 8px; }
+.tabs button.active { background: #0b5fff; } .tabs button:not(.active) { background: #dde3ee; color: #111; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }
+.overlay .card { width: 320px; text-align: center; }

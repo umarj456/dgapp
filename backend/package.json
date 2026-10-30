@@ -1,0 +1,35 @@
+{
+  "name": "dg-app-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dialer Giants DG App API (Phase 1 scaffold)",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "migrate": "tsx src/migrate.ts",
+    "migrate:prod": "node dist/migrate.js",
+    "seed": "tsx src/seed.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "fastify": "^5.12.7",
+    "pg": "^8.23.1",
+    "stripe": "^23.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12"
+  }
+}
