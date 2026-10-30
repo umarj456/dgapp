@@ -27,7 +27,7 @@ Not done by this repo. Do not install Docker on `138.201.138.161`. Do not change
 - [ ] Sign up through an SSH tunnel, read the OTP from the API log, and confirm the Stripe stub marks the payment method and a top-up.
 - [ ] Keep `NODE_ENV=development` until real OTP delivery and real Stripe keys exist.
 
-A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set to `http://<private-ip>:<port>`. The Kamailio edge is not part of this install.
+A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set to `http://<private-ip>:<port>`. The Kamailio lab install is [`EDGE_DEPLOY.md`](EDGE_DEPLOY.md). It is not started until Umar says go.
 
 ## Still required before real traffic (Umar)
 
@@ -39,8 +39,8 @@ A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set t
 - [ ] Real OTP. `smtp` and `twilio` are named in config and are not implemented. Console OTP cannot be the production provider.
 - [ ] KYC vendor, or named staff for manual ID/address review (`POST /internal/v1/kyc/review`).
 - [ ] DNS when ready: `app.` and `sip.` names, plus TLS certificates. Isolated mode does not need them.
-- [ ] An edge host that is **not** the current app server (Asterisk already binds UDP `5060` there). Kamailio + rtpengine in `edge/` are a draft and are not deployed.
-- [ ] Firewall: SIP only from SIPNAV, WSS and RTP as in `edge/firewall.nft.example`, API not on the public internet. `INTERNAL_API_TOKEN` must be a new secret (the dev default is refused in production) and `INTERNAL_ALLOWED_IPS` must be the edge address.
+- [ ] LEAD confirms the SIPNAV DG App account id, signalling IP (lab default `88.151.129.15`), and tech prefix (placeholder `"05436#"` until then). Developer then installs the edge on 138 with [`EDGE_DEPLOY.md`](EDGE_DEPLOY.md): UDP `15060` and WSS `18443`, not Asterisk's `5060` or the DID portal. Configs are in the repo and are not installed yet.
+- [ ] Firewall on 138: add firewalld rich rules from `EDGE_DEPLOY.md` (SIP only from the SIPNAV IP, WSS, RTP `35000-35999`). Do not load `edge/firewall.nft.example` on that host. `INTERNAL_API_TOKEN` must match Kamailio `API_TOKEN` and must not be the dev default once `NODE_ENV=production`.
 - [ ] Where the API and Postgres will live in production (the isolated folder is a smoke host, not the public edge).
 
 Phase 2, not this checklist: Apple/Google developer accounts, Firebase, and mobile push.

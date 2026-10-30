@@ -1,4 +1,7 @@
-# nftables sketch for the edge (apply only after approval). SIP/UDP only from SIPNAV; WSS from anywhere.
+# Dedicated-VM sketch only. Do NOT load this on 138.201.138.161.
+# That host uses firewalld. A second table with policy drop can cut off SSH and the live apps.
+# On 138, add the firewalld rich rules in EDGE_DEPLOY.md (UDP 15060 from SIPNAV, TCP 18443, UDP 35000-35999).
+# nftables sketch for a future edge VM. SIP/UDP only from SIPNAV; WSS from anywhere.
 table inet dgedge {
   chain input {
     type filter hook input priority 0; policy drop;
