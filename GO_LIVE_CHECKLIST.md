@@ -35,7 +35,9 @@ A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set t
 - [ ] A real DID block assigned to that account and routed to the edge. Import with `cd backend && npm run seed -- /path/to/sipnav-dgapp.csv` (header `E.164,country,monthly_price_cents`). The `555` sample is not inventory. Local stub test: `TESTING.md`.
 - [ ] Approved retail rates and monthly number prices (migration `003` values are placeholders).
 - [ ] Launch countries and the first pool size.
-- [ ] Stripe account. Deliver `sk_live_` / `sk_test_`, `whsec_`, and `pk_live_` / `pk_test_` out of band. Set `STRIPE_STUB_MODE=false` only with those keys, and only with `NODE_ENV=production` once OTP is real too.
+- [ ] Stripe, out of band into the host `.env` only: `STRIPE_SECRET_KEY` (secret `sk_live_` or restricted `rk_live_`), `STRIPE_PUBLISHABLE_KEY` (`pk_live_`), and `STRIPE_WEBHOOK_SECRET` (the `whsec_` signing secret). Webhook endpoint is `POST /v1/stripe/webhook`. Set `STRIPE_STUB_MODE=false`. Do not commit the values.
+- [ ] PayPal, out of band into the same file: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `PAYPAL_MODE=live`. A PayPal capture credits the prepaid wallet or activates a reserved number.
+- [ ] Real DID import: `MIGRATE_DEV_SEED=false`, then `npm run seed -- /path/to/sipnav-dgapp.csv`. The 555 sample is not inventory.
 - [ ] Real OTP. `smtp` and `twilio` are named in config and are not implemented. Console OTP cannot be the production provider.
 - [ ] KYC vendor, or named staff for manual ID/address review (`POST /internal/v1/kyc/review`).
 - [ ] DNS when ready: `app.` and `sip.` names, plus TLS certificates. Isolated mode does not need them.

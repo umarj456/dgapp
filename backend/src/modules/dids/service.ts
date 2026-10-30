@@ -38,7 +38,7 @@ function addMonth(d: Date): Date {
  * 'stripe': number is reserved (pending_payment) until the Stripe checkout webhook activates it.
  * No SIPNAV change is needed: the whole pool already routes to the DG App account.
  */
-export async function buyDid(c: pg.PoolClient, userId: string, didId: string, billing: 'wallet' | 'stripe') {
+export async function buyDid(c: pg.PoolClient, userId: string, didId: string, billing: 'wallet' | 'stripe' | 'paypal') {
   const d = await c.query(`SELECT * FROM did_pool WHERE id=$1 FOR UPDATE`, [didId]);
   if (!d.rowCount) throw new HttpError(404, 'did_not_found');
   const did = d.rows[0];
@@ -62,11 +62,23 @@ export async function buyDid(c: pg.PoolClient, userId: string, didId: string, bi
   }
   const a = await c.query(
     `INSERT INTO did_assignments (did_id, user_id, status, billing_source, is_primary_cid)
-     VALUES ($1,$2,'pending_payment','stripe',$3) RETURNING id`,
-    [didId, userId, !hasPrimary.rowCount],
+     VALUES ($1,$2,'pending_payment',$3,$4) RETURNING id`,
+    [didId, userId, billing, !hasPrimary.rowCount],
   );
   await c.query(`UPDATE did_pool SET status='reserved', updated_at=now() WHERE id=$1`, [didId]);
   return { assignmentId: a.rows[0].id as string, e164: did.e164 as string, status: 'pending_payment' as const, monthlyMicros: Number(did.monthly_price_micros) };
+}
+
+/** Checkout failed before the payer approved. Put the number back on sale. */
+export async function abandonPendingPayment(c: pg.PoolClient, assignmentId: string, userId: string) {
+  const r = await c.query(
+    `UPDATE did_assignments SET status='released', released_at=now()
+      WHERE id=$1 AND user_id=$2 AND status='pending_payment' RETURNING did_id`,
+    [assignmentId, userId],
+  );
+  if (r.rowCount) {
+    await c.query(`UPDATE did_pool SET status='available', updated_at=now() WHERE id=$1 AND status='reserved'`, [r.rows[0].did_id]);
+  }
 }
 
 /** Release: assignment ends, number rests in cooldown before it can be resold. */

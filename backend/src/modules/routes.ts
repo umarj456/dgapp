@@ -5,13 +5,16 @@ import { config } from '../config.js';
 import { pool, tx } from '../db.js';
 import { HttpError } from '../lib/errors.js';
 import { authenticate } from './auth/plugin.js';
-import { buyDid, didCountry, myNumbers, releaseAssignment, searchAvailable } from './dids/service.js';
+import { abandonPendingPayment, buyDid, didCountry, myNumbers, releaseAssignment, searchAvailable } from './dids/service.js';
 import { evaluateKyc, latestByType } from './kyc/gate.js';
 import { requireKyc, type KycDeps } from './kyc/middleware.js';
 import { loadCountryRequirement, loadKycChecks, recordKycCheck } from './kyc/repo.js';
 import { issueDeviceCredential, revokeDeviceCredential } from './sip/service.js';
-import { getWallet, microsToUsd, usdToMicros } from './wallet/repo.js';
+import { getWallet, microsToUsd, postLedger, usdToMicros } from './wallet/repo.js';
+import { isStripePublishableKey } from './wallet/keys.js';
+import { capturePayPalOrder, createPayPalOrder, encodePayPalCustom, paypalConfigured, planPayPalCapture } from './wallet/paypal.js';
 import { createDidSubscriptionCheckout, createSetupIntent, createTopupCheckout, ensureCustomer } from './wallet/stripe.js';
+import { activateStripeAssignment } from './dids/service.js';
 
 export const kycDeps: KycDeps = {
   loadChecks: (id) => loadKycChecks(pool, id),
@@ -27,6 +30,12 @@ async function stripeCustomer(userId: string, email: string): Promise<string | n
 
 export async function userRoutes(app: FastifyInstance) {
   const auth = authenticate(pool);
+
+  app.get('/v1/billing/config', async () => ({
+    stripeStub: config.STRIPE_STUB_MODE,
+    stripePublishableKey: isStripePublishableKey(config.STRIPE_PUBLISHABLE_KEY) ? config.STRIPE_PUBLISHABLE_KEY : '',
+    paypal: paypalConfigured(),
+  }));
 
   app.get('/v1/me', { preHandler: auth }, async (req) => {
     const u = req.user!;
@@ -72,7 +81,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   app.get('/v1/dids/mine', { preHandler: auth }, async (req) => myNumbers(pool, req.user!.id));
 
-  const didBody = z.object({ didId: z.string().uuid(), billing: z.enum(['wallet', 'stripe']).default('wallet') });
+  const didBody = z.object({ didId: z.string().uuid(), billing: z.enum(['wallet', 'stripe', 'paypal']).default('wallet') });
   app.post('/v1/dids/buy', {
     preHandler: [auth, requireKyc(kycDeps, 'buy_did', (req) => {
       const p = didBody.safeParse(req.body);
@@ -80,7 +89,23 @@ export async function userRoutes(app: FastifyInstance) {
     })],
   }, async (req) => {
     const b = didBody.parse(req.body);
+    if (b.billing === 'paypal' && !paypalConfigured()) throw new HttpError(503, 'paypal_not_configured');
     const res = await tx((c) => buyDid(c, req.user!.id, b.didId, b.billing));
+    if (res.status === 'pending_payment' && b.billing === 'paypal') {
+      try {
+        const order = await createPayPalOrder({
+          customId: encodePayPalCustom('did', req.user!.id, res.assignmentId),
+          amountMicros: res.monthlyMicros!,
+          description: `Phone number +${res.e164}`,
+          returnUrl: `${config.WEB_ORIGIN}/?paypal=return`,
+          cancelUrl: `${config.WEB_ORIGIN}/?paypal=cancel`,
+        });
+        return { ...res, checkoutUrl: order.url, checkoutId: order.id, stub: false, provider: 'paypal' as const };
+      } catch (e) {
+        await tx((c) => abandonPendingPayment(c, res.assignmentId, req.user!.id));
+        throw e;
+      }
+    }
     if (res.status === 'pending_payment') {
       const cust = await stripeCustomer(req.user!.id, req.user!.email);
       const co = await createDidSubscriptionCheckout(req.user!.id, cust, res.assignmentId, res.e164, res.monthlyMicros!);
@@ -108,6 +133,54 @@ export async function userRoutes(app: FastifyInstance) {
     const b = z.object({ amountUsd: z.number().min(5).max(500) }).parse(req.body);
     const cust = await stripeCustomer(req.user!.id, req.user!.email);
     return createTopupCheckout(req.user!.id, cust, usdToMicros(b.amountUsd));
+  });
+
+  app.post('/v1/wallet/paypal/order', { preHandler: auth }, async (req) => {
+    if (!paypalConfigured()) throw new HttpError(503, 'paypal_not_configured');
+    const b = z.object({ amountUsd: z.number().min(5).max(500) }).parse(req.body);
+    const micros = usdToMicros(b.amountUsd);
+    const order = await createPayPalOrder({
+      customId: encodePayPalCustom('topup', req.user!.id, micros),
+      amountMicros: micros,
+      description: 'DG App calling credit',
+      returnUrl: `${config.WEB_ORIGIN}/?paypal=return`,
+      cancelUrl: `${config.WEB_ORIGIN}/?paypal=cancel`,
+    });
+    return { id: order.id, url: order.url };
+  });
+
+  /** Browser return from PayPal. Credits the wallet or activates the reserved DID. */
+  app.post('/v1/paypal/capture', { preHandler: auth }, async (req) => {
+    const b = z.object({ orderId: z.string().min(1).max(80) }).parse(req.body);
+    const order = await capturePayPalOrder(b.orderId);
+    const plan = planPayPalCapture(order, req.user!.id);
+    if (!plan.ok) throw new HttpError(400, 'paypal_capture_rejected', plan.reason);
+    if (plan.kind === 'topup') {
+      const applied = await tx(async (c) => {
+        const ok = await postLedger(c, plan.userId, 'topup', plan.micros, {
+          idempotencyKey: `paypal:${plan.captureId}`, refType: 'paypal_capture', refId: plan.captureId, memo: 'PayPal top-up',
+        });
+        await recordKycCheck(c, plan.userId, 'payment_method', 'passed', { provider: 'paypal', reference: plan.captureId });
+        return ok;
+      });
+      return { credited: applied, kind: 'topup' };
+    }
+    const applied = await tx(async (c) => {
+      const seen = await c.query(`INSERT INTO stripe_events (id, type) VALUES ($1,'paypal.capture') ON CONFLICT DO NOTHING`, [`paypal:${plan.captureId}`]);
+      if (!seen.rowCount) return false;
+      const row = await c.query(
+        `SELECT a.id, p.monthly_price_micros + p.setup_price_micros AS due
+           FROM did_assignments a JOIN did_pool p ON p.id = a.did_id
+          WHERE a.id=$1 AND a.user_id=$2 AND a.status='pending_payment' AND a.billing_source='paypal'`,
+        [plan.assignmentId, plan.userId],
+      );
+      if (!row.rowCount) throw new HttpError(409, 'paypal_assignment_missing');
+      if (Number(row.rows[0].due) !== plan.paidMicros) throw new HttpError(400, 'paypal_amount');
+      await activateStripeAssignment(c, plan.assignmentId, null, null);
+      await recordKycCheck(c, plan.userId, 'payment_method', 'passed', { provider: 'paypal', reference: plan.captureId });
+      return true;
+    });
+    return { credited: applied, kind: 'did' };
   });
 
   // ---- SIP device credentials (for the WebRTC client) ----
