@@ -136,3 +136,16 @@ curl -X POST http://127.0.0.1:4100/v1/stripe/webhook -H 'content-type: applicati
 ```
 
 Use port `8080` on the Docker layout.
+
+## Live Stripe and PayPal
+
+The isolated lab keeps `STRIPE_STUB_MODE=true` and `MIGRATE_DEV_SEED=true`. When LEAD pastes live credentials into the host `.env` (never into git):
+
+- `STRIPE_SECRET_KEY` — secret key or restricted key
+- `STRIPE_PUBLISHABLE_KEY` — browser key, also set as `VITE_STRIPE_PUBLISHABLE_KEY` for the web dev server
+- `STRIPE_WEBHOOK_SECRET` — signing secret for `POST /v1/stripe/webhook`
+- `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `PAYPAL_MODE=live`
+- `STRIPE_STUB_MODE=false`
+- `MIGRATE_DEV_SEED=false`, then import the real DID CSV with `npm run seed`
+
+`NODE_ENV=production` already refuses stub mode, console OTP, and the default internal token. A live Stripe key also refuses stub mode in development. Stripe cannot reach `127.0.0.1`, so the webhook needs a public HTTPS URL before live card events will arrive. Until then, keep the stub for the lab.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, hasToken, setToken, type Me } from './lib/api';
 import SignUp from './screens/SignUp';
 import Verify from './screens/Verify';
@@ -16,7 +16,18 @@ export default function App() {
   const refresh = useCallback(async () => {
     try { setMe(await api<Me>('/v1/me')); } catch { setToken(''); setMe(null); } finally { setLoading(false); }
   }, []);
+  const paypalOnce = useRef(false);
   useEffect(() => { if (hasToken()) refresh(); }, [refresh]);
+  useEffect(() => {
+    if (paypalOnce.current || !hasToken()) return;
+    const q = new URLSearchParams(window.location.search);
+    const orderId = q.get('token');
+    if (q.get('paypal') !== 'return' || !orderId) return;
+    paypalOnce.current = true;
+    api('/v1/paypal/capture', { body: { orderId } })
+      .then(() => { window.history.replaceState({}, '', window.location.pathname); setTab('wallet'); return refresh(); })
+      .catch(() => setTab('wallet'));
+  }, [refresh]);
 
   if (loading) return <div className="app">Loading...</div>;
   if (!me) return <div className="app"><h1>DG App</h1><SignUp onSignedIn={refresh} /></div>;

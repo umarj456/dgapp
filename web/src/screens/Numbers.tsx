@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError, type AvailableDid, type Me } from '../lib/api';
+import { billingConfig } from '../lib/billing';
 import { simulateStripeEvent } from '../lib/stubStripe';
 
 const fmt = (e164: string) => (e164.startsWith('1') && e164.length === 11 ? `+1 (${e164.slice(1, 4)}) ${e164.slice(4, 7)}-${e164.slice(7)}` : `+${e164}`);
@@ -10,12 +11,14 @@ export default function Numbers({ me, onChange }: { me: Me; onChange: () => void
   const [contains, setContains] = useState('');
   const [results, setResults] = useState<AvailableDid[]>([]);
   const [msg, setMsg] = useState('');
+  const [paypal, setPaypal] = useState(false);
+  useEffect(() => { billingConfig().then((c) => setPaypal(c.paypal)).catch(() => {}); }, []);
 
   const search = async () => {
     const q = new URLSearchParams({ country, ...(contains ? { contains } : {}) });
     setResults(await api<AvailableDid[]>(`/v1/dids/search?${q}`));
   };
-  const buy = async (d: AvailableDid, billing: 'wallet' | 'stripe') => {
+  const buy = async (d: AvailableDid, billing: 'wallet' | 'stripe' | 'paypal') => {
     try {
       const r = await api<{ status: string; checkoutUrl?: string; checkoutId?: string; stub?: boolean; assignmentId?: string; e164: string }>('/v1/dids/buy', { body: { didId: d.id, billing } });
       if (r.stub && r.checkoutId && r.assignmentId) {
@@ -74,6 +77,7 @@ export default function Numbers({ me, onChange }: { me: Me; onChange: () => void
             <div className="row">
               <button onClick={() => buy(d, 'wallet')}>Pay from balance</button>
               <button className="secondary" onClick={() => buy(d, 'stripe')}>Subscribe by card</button>
+              {paypal && <button className="secondary" onClick={() => buy(d, 'paypal')}>PayPal</button>}
             </div>
           </div>
         ))}

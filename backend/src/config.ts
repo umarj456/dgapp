@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { z } from 'zod';
+import { isLiveStripeSecret, isPlaceholder, isStripeSecretKey } from './modules/wallet/keys.js';
 
 const bool = (d: boolean) =>
   z.string().optional().transform((v) => (v === undefined || v === '' ? d : ['1', 'true', 'yes'].includes(v.toLowerCase())));
@@ -19,8 +20,12 @@ const schema = z.object({
   SIP_REALM: z.string().default('sip.dialergiants.example'),
   SIPNAV_TECH_PREFIX: z.string().default('05436#'),
   STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_STUB_MODE: bool(true),
+  PAYPAL_CLIENT_ID: z.string().optional(),
+  PAYPAL_CLIENT_SECRET: z.string().optional(),
+  PAYPAL_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
   MAX_CALL_SECONDS: int(4 * 3600),
   MIN_CALL_SECONDS: int(6),
   DID_COOLDOWN_DAYS: int(30),
@@ -29,10 +34,26 @@ const schema = z.object({
 });
 
 export type Config = z.infer<typeof schema>;
-export const config: Config = schema.parse(process.env);
 
-if (config.NODE_ENV === 'production') {
-  if (config.INTERNAL_API_TOKEN === 'change-me-dev-only') throw new Error('INTERNAL_API_TOKEN must be set in production');
-  if (config.STRIPE_STUB_MODE) throw new Error('STRIPE_STUB_MODE must be false in production');
-  if (config.OTP_PROVIDER === 'console') throw new Error('OTP_PROVIDER=console is dev-only');
+/** Boot checks. Live Stripe keys (sk_live_ or rk_live_) cannot run with the stub. */
+export function assertRuntimeConfig(c: Config) {
+  if (c.NODE_ENV === 'production') {
+    if (c.INTERNAL_API_TOKEN === 'change-me-dev-only') throw new Error('INTERNAL_API_TOKEN must be set in production');
+    if (c.STRIPE_STUB_MODE) throw new Error('STRIPE_STUB_MODE must be false in production');
+    if (c.OTP_PROVIDER === 'console') throw new Error('OTP_PROVIDER=console is dev-only');
+    const paypalSet = !isPlaceholder(c.PAYPAL_CLIENT_ID) || !isPlaceholder(c.PAYPAL_CLIENT_SECRET);
+    if (paypalSet && c.PAYPAL_MODE !== 'live') throw new Error('PAYPAL_MODE must be live in production');
+  }
+  if (isLiveStripeSecret(c.STRIPE_SECRET_KEY) && c.STRIPE_STUB_MODE) {
+    throw new Error('STRIPE_STUB_MODE must be false when a live Stripe key is set');
+  }
+  if (!c.STRIPE_STUB_MODE && c.STRIPE_SECRET_KEY && !isStripeSecretKey(c.STRIPE_SECRET_KEY)) {
+    throw new Error('STRIPE_SECRET_KEY must be an sk_ or rk_ key');
+  }
+  if (!c.STRIPE_STUB_MODE && c.STRIPE_SECRET_KEY && !c.STRIPE_WEBHOOK_SECRET) {
+    throw new Error('STRIPE_WEBHOOK_SECRET must be set when Stripe stub mode is off');
+  }
 }
+
+export const config: Config = schema.parse(process.env);
+assertRuntimeConfig(config);

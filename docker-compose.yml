@@ -34,7 +34,11 @@ services:
       OTP_PROVIDER: console          # codes: docker compose logs -f api
       STRIPE_STUB_MODE: "true"
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-dev-only}
       INTERNAL_ALLOWED_IPS: 127.0.0.1,::1,::ffff:127.0.0.1
       SIPNAV_TECH_PREFIX: "${SIPNAV_TECH_PREFIX:-05436#}"
@@ -56,7 +60,7 @@ services:
     command: sh -c "npm ci && npx vite --host 0.0.0.0 --port 5173 --strictPort"
     environment:
       VITE_PROXY_TARGET: http://api:8080
-      VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
     volumes: ["./web:/app", "webmodules:/app/node_modules"]
     depends_on:
       api: { condition: service_healthy }

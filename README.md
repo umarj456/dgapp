@@ -95,11 +95,13 @@ Stub mode is refused when `NODE_ENV=production` (as are the console OTP provider
 | POST | `/v1/kyc/payment-method/setup` | Stripe SetupIntent (payment-method KYC) |
 | POST | `/v1/kyc/documents` | ID / address submission (manual review in Phase 1) |
 | GET | `/v1/dids/search`, `/v1/dids/mine` | pool search, my numbers |
-| POST | `/v1/dids/buy` | **KYC-gated**; `billing: wallet` (instant) or `stripe` (subscription checkout) |
+| GET | `/v1/billing/config` | publishable key, stub flag, whether PayPal is configured |
+| POST | `/v1/dids/buy` | **KYC-gated**; `billing: wallet`, `stripe`, or `paypal` |
 | POST | `/v1/dids/:assignmentId/release` | number goes to cooldown (30 days) before resale |
 | POST | `/v1/wallet/topup`, GET `/v1/wallet/ledger` | Stripe Checkout top-up, history |
+| POST | `/v1/wallet/paypal/order`, POST `/v1/paypal/capture` | PayPal top-up or DID; capture credits the wallet or activates the number |
 | POST | `/v1/sip/credentials` | per-device SIP login for the WebRTC client |
-| POST | `/v1/stripe/webhook` | signature-verified (live) / unsigned (stub) |
+| POST | `/v1/stripe/webhook` | signature from `STRIPE_WEBHOOK_SECRET` when stub mode is off; unsigned only in stub mode |
 | GET | `/internal/v1/sip/auth` | edge only: HA1 for digest auth |
 | POST | `/internal/v1/calls/authorize`, `/inbound`, `/end` | edge only: call control + CDR |
 | POST | `/internal/v1/kyc/review`, `/internal/v1/jobs/maintenance` | ops: KYC review, renewals/cooldown/stale holds (cron) |

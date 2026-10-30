@@ -5,11 +5,13 @@
 import Stripe from 'stripe';
 import { config } from '../../config.js';
 import { randomToken } from '../../lib/crypto.js';
+import { isStripeSecretKey } from './keys.js';
 
 let client: Stripe | null = null;
+/** Accepts sk_test_, sk_live_, rk_test_, and rk_live_ (restricted) keys. The value is only read from env. */
 export function stripe(): Stripe | null {
-  if (config.STRIPE_STUB_MODE || !config.STRIPE_SECRET_KEY) return null;
-  client ??= new Stripe(config.STRIPE_SECRET_KEY);
+  if (config.STRIPE_STUB_MODE || !isStripeSecretKey(config.STRIPE_SECRET_KEY)) return null;
+  client ??= new Stripe(config.STRIPE_SECRET_KEY!);
   return client;
 }
 

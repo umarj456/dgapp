@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { loadStripe, type Stripe, type StripeCardElement } from '@stripe/stripe-js';
 import { api, type Me } from '../lib/api';
+import { billingConfig } from '../lib/billing';
 import { simulateStripeEvent } from '../lib/stubStripe';
 
 const LABEL: Record<string, string> = {
@@ -13,6 +15,10 @@ export default function Verify({ me, onChange }: { me: Me; onChange: () => void 
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
   const [msg, setMsg] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [publishableKey, setPublishableKey] = useState('');
+  const cardHost = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<{ stripe: Stripe; card: StripeCardElement } | null>(null);
   const st = (k: string) => me.kyc.checks[k] ?? 'missing';
 
   const sendCode = async () => {
@@ -36,8 +42,32 @@ export default function Verify({ me, onChange }: { me: Me; onChange: () => void 
         onChange();
         return;
       }
-      setMsg('Complete card setup in the form.');
+      const cfg = await billingConfig();
+      if (!cfg.stripePublishableKey) { setMsg('Set STRIPE_PUBLISHABLE_KEY on the server, then reload.'); return; }
+      setPublishableKey(cfg.stripePublishableKey);
+      setClientSecret(si.clientSecret);
+      setMsg('Enter the card. Stripe confirms it. This server does not see the card number.');
     } catch (e) { setMsg((e as Error).message); }
+  };
+  useEffect(() => {
+    if (!clientSecret || !publishableKey || !cardHost.current) return;
+    let gone = false;
+    let card: StripeCardElement | undefined;
+    (async () => {
+      const stripe = await loadStripe(publishableKey);
+      if (!stripe || gone || !cardHost.current) return;
+      card = stripe.elements().create('card');
+      card.mount(cardHost.current);
+      cardRef.current = { stripe, card };
+    })();
+    return () => { gone = true; card?.unmount(); cardRef.current = null; };
+  }, [clientSecret, publishableKey]);
+  const confirmCard = async () => {
+    const held = cardRef.current;
+    if (!held) return;
+    const result = await held.stripe.confirmCardSetup(clientSecret, { payment_method: { card: held.card } });
+    if (result.error) { setMsg(result.error.message ?? 'Card setup failed'); return; }
+    setMsg('Card sent to Stripe. The payment method shows as verified after the webhook.');
   };
 
   return (
@@ -62,6 +92,8 @@ export default function Verify({ me, onChange }: { me: Me; onChange: () => void 
         </>
       )}
       {st('payment_method') !== 'passed' && <button onClick={addCard}>Add a card</button>}
+      {clientSecret && <div ref={cardHost} />}
+      {clientSecret && <button onClick={confirmCard}>Save card</button>}
       {me.kyc.canCall && <p className="ok">All set. You can buy a number and call.</p>}
       {msg && <p className="muted">{msg}</p>}
     </div>

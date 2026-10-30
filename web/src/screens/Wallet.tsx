@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Me } from '../lib/api';
+import { billingConfig } from '../lib/billing';
 import { simulateStripeEvent } from '../lib/stubStripe';
 
 interface Entry { id: number; kind: string; amount_micros: number; balance_after: number; memo: string | null; created_at: string }
@@ -9,7 +10,9 @@ export default function Wallet({ me, onChange }: { me: Me; onChange: () => void 
   const [ledger, setLedger] = useState<Entry[]>([]);
   const [amount, setAmount] = useState(10);
   const [msg, setMsg] = useState('');
+  const [paypal, setPaypal] = useState(false);
   const load = () => { api<Entry[]>('/v1/wallet/ledger').then(setLedger).catch(() => {}); };
+  useEffect(() => { billingConfig().then((c) => setPaypal(c.paypal)).catch(() => {}); }, []);
   useEffect(() => { load(); }, []);
 
   const topup = async () => {
@@ -31,6 +34,11 @@ export default function Wallet({ me, onChange }: { me: Me; onChange: () => void 
     }
     window.location.href = r.url;
   };
+  const paypalTopup = async () => {
+    setMsg('');
+    const r = await api<{ url: string }>('/v1/wallet/paypal/order', { body: { amountUsd: amount } });
+    window.location.href = r.url;
+  };
 
   return (
     <>
@@ -42,6 +50,7 @@ export default function Wallet({ me, onChange }: { me: Me; onChange: () => void 
             {[5, 10, 25, 50].map((a) => <option key={a} value={a}>${a}</option>)}
           </select>
           <button onClick={topup}>Add credit</button>
+          {paypal && <button className="secondary" onClick={paypalTopup}>PayPal</button>}
         </div>
         {msg && <p className="muted">{msg}</p>}
       </div>
