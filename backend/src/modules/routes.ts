@@ -84,7 +84,7 @@ export async function userRoutes(app: FastifyInstance) {
     if (res.status === 'pending_payment') {
       const cust = await stripeCustomer(req.user!.id, req.user!.email);
       const co = await createDidSubscriptionCheckout(req.user!.id, cust, res.assignmentId, res.e164, res.monthlyMicros!);
-      return { ...res, checkoutUrl: co.url, stub: co.stub };
+      return { ...res, checkoutUrl: co.url, checkoutId: co.id, stub: co.stub };
     }
     return res;
   });

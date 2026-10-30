@@ -1,17 +1,35 @@
 import { useEffect, useState } from 'react';
 import { api, type Me } from '../lib/api';
+import { simulateStripeEvent } from '../lib/stubStripe';
 
 interface Entry { id: number; kind: string; amount_micros: number; balance_after: number; memo: string | null; created_at: string }
 const usd = (m: number) => (m / 1e6).toFixed(m % 10000 === 0 ? 2 : 4);
 
-export default function Wallet({ me }: { me: Me }) {
+export default function Wallet({ me, onChange }: { me: Me; onChange: () => void }) {
   const [ledger, setLedger] = useState<Entry[]>([]);
   const [amount, setAmount] = useState(10);
-  useEffect(() => { api<Entry[]>('/v1/wallet/ledger').then(setLedger).catch(() => {}); }, []);
+  const [msg, setMsg] = useState('');
+  const load = () => { api<Entry[]>('/v1/wallet/ledger').then(setLedger).catch(() => {}); };
+  useEffect(() => { load(); }, []);
 
   const topup = async () => {
-    const r = await api<{ url: string }>('/v1/wallet/topup', { body: { amountUsd: amount } });
-    window.location.href = r.url; // Stripe Checkout (or stub URL in dev)
+    setMsg('');
+    const r = await api<{ url: string; stub?: boolean; id: string }>('/v1/wallet/topup', { body: { amountUsd: amount } });
+    if (r.stub) {
+      await simulateStripeEvent({
+        id: `evt_${r.id}`,
+        type: 'checkout.session.completed',
+        object: {
+          id: r.id, mode: 'payment', payment_status: 'paid', amount_total: amount * 100,
+          metadata: { kind: 'topup', user_id: me.id },
+        },
+      });
+      setMsg(`Dev stub added $${amount} of calling credit.`);
+      load();
+      onChange();
+      return;
+    }
+    window.location.href = r.url;
   };
 
   return (
@@ -25,6 +43,7 @@ export default function Wallet({ me }: { me: Me }) {
           </select>
           <button onClick={topup}>Add credit</button>
         </div>
+        {msg && <p className="muted">{msg}</p>}
       </div>
       <div className="card">
         <h2>History</h2>

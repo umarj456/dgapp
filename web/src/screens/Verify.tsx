@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, type Me } from '../lib/api';
+import { simulateStripeEvent } from '../lib/stubStripe';
 
 const LABEL: Record<string, string> = {
   email: 'Email verified', phone: 'Phone number verified', payment_method: 'Payment method verified',
@@ -22,10 +23,20 @@ export default function Verify({ me, onChange }: { me: Me; onChange: () => void 
   };
   const addCard = async () => {
     try {
-      const si = await api<{ clientSecret: string; stub: boolean }>('/v1/kyc/payment-method/setup', { body: {} });
-      // TODO(phase 1 live): mount Stripe Elements with VITE_STRIPE_PUBLISHABLE_KEY and confirmCardSetup(si.clientSecret).
+      const si = await api<{ clientSecret: string; stub: boolean; id: string }>('/v1/kyc/payment-method/setup', { body: {} });
+      // Live mode mounts Stripe Elements with VITE_STRIPE_PUBLISHABLE_KEY and confirmCardSetup(si.clientSecret).
       // The API marks the check passed when Stripe sends setup_intent.succeeded to the webhook.
-      setMsg(si.stub ? 'Stripe is in stub mode: payment setup is simulated by the backend webhook in dev.' : 'Complete card setup in the form.');
+      if (si.stub) {
+        await simulateStripeEvent({
+          id: `evt_${si.id}`,
+          type: 'setup_intent.succeeded',
+          object: { id: si.id, metadata: { user_id: me.id } },
+        });
+        setMsg('Dev stub recorded a verified payment method.');
+        onChange();
+        return;
+      }
+      setMsg('Complete card setup in the form.');
     } catch (e) { setMsg((e as Error).message); }
   };
 
@@ -47,6 +58,7 @@ export default function Verify({ me, onChange }: { me: Me; onChange: () => void 
               <button onClick={verifyCode}>Verify</button>
             </div>
           )}
+          {sent && <p className="muted">On a local install the code is in the API log (console OTP), on the line that starts with [otp:sms].</p>}
         </>
       )}
       {st('payment_method') !== 'passed' && <button onClick={addCard}>Add a card</button>}

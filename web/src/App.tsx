@@ -37,7 +37,7 @@ export default function App() {
       </div>
       {current === 'verify' && <Verify me={me} onChange={refresh} />}
       {current === 'numbers' && <Numbers me={me} onChange={refresh} />}
-      {current === 'wallet' && <Wallet me={me} />}
+      {current === 'wallet' && <Wallet me={me} onChange={refresh} />}
       {current === 'dialer' && <Dialer me={me} />}
       <p className="muted">
         {me.email} · <a href="#" onClick={async (e) => { e.preventDefault(); await api('/v1/auth/logout', { method: 'POST', body: {} }).catch(() => {}); setToken(''); setMe(null); }}>Sign out</a>

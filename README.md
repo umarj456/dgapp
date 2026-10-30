@@ -10,7 +10,10 @@ Approved plan: [`PLAN.md`](PLAN.md).
 ```
 dg-app/
 ├── PLAN.md               approved build plan
-├── docker-compose.yml    local dev: postgres + api
+├── DEPLOY_LOCAL.md       isolated Linux folder (/opt/dgapp-test), loopback, no public DNS
+├── GO_LIVE_CHECKLIST.md  repo-ready items vs what Umar still has to provide
+├── .env.example          Compose placeholders (loopback binds, Stripe test-key placeholders)
+├── docker-compose.yml    dedicated machine: postgres + api + web (loopback ports, health checks)
 ├── backend/              Node 20 + TypeScript + Fastify + Postgres
 │   ├── migrations/       001 schema, 002 reference data (KYC country rules, IRSF blocklist), 003 dev sample data
 │   ├── src/modules/
@@ -43,23 +46,22 @@ Money is stored as integer micro-USD. All limits are in `src/modules/fraud/fraud
 
 ## Run locally
 
-### Option A: Docker
+Isolated folder on a Linux host that already runs other apps: [`DEPLOY_LOCAL.md`](DEPLOY_LOCAL.md).
+What Umar still has to provide before real traffic: [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
+
+There is no public DNS in either path. Open the web UI at the `WEB_ORIGIN` you set (default loopback). Console OTP codes are log lines `[otp:email]` and `[otp:sms]`. `GET /healthz` returns `{"ok":true}` after a database ping.
+
+### Option A: Docker (dedicated machine)
+Host ports bind to 127.0.0.1. If 5432 or 8080 is already taken, change `POSTGRES_PORT` and `API_PORT` in `.env` before starting.
 ```bash
+cp .env.example .env
 docker compose up --build
-# API on http://localhost:8080 (OTP codes appear in: docker compose logs -f api)
-cd web && npm install && npm run dev      # http://localhost:5173 (proxies /v1 to the API)
+curl -fsS http://127.0.0.1:8080/healthz          # {"ok":true}
+# UI: http://127.0.0.1:5173    OTP: docker compose logs -f api
 ```
 
-### Option B: without Docker
-```bash
-# Postgres 13+ running locally with a dgapp database
-cd backend
-cp .env.example .env            # edit DATABASE_URL if needed
-npm install
-MIGRATE_DEV_SEED=true npm run migrate
-npm run dev                     # http://localhost:8080
-cd ../web && npm install && npm run dev
-```
+### Option B: Node + Postgres (shared host, no Docker)
+`backend/.env.example` listens on 127.0.0.1:4100 and expects Postgres on 127.0.0.1:5433. The web dev server listens on 127.0.0.1:4200 and proxies `/v1` to the API. Those ports stay off the live listeners called out in `SERVER_138.201.138.161_survey.md` (8080, 5432, UDP 5060). Step-by-step: [`DEPLOY_LOCAL.md`](DEPLOY_LOCAL.md).
 
 ### Tests
 ```bash
@@ -71,18 +73,19 @@ cd ../web && npm run build
 ```
 
 ### Simulating payments in dev (Stripe stub mode)
-With `STRIPE_STUB_MODE=true` the webhook accepts unsigned JSON, so you can mark a card verified and top up:
+With `STRIPE_STUB_MODE=true` the web UI posts the unsigned webhook for you (payment method, wallet top-up, card-billed number). The same webhook accepts a manual unsigned JSON body:
 ```bash
-curl -X POST localhost:8080/v1/stripe/webhook -H 'content-type: application/json' \
+curl -X POST http://127.0.0.1:8080/v1/stripe/webhook -H 'content-type: application/json' \
   -d '{"id":"evt_dev1","type":"setup_intent.succeeded","data":{"object":{"id":"seti_dev","metadata":{"user_id":"<USER_ID>"}}}}'
-curl -X POST localhost:8080/v1/stripe/webhook -H 'content-type: application/json' \
+curl -X POST http://127.0.0.1:8080/v1/stripe/webhook -H 'content-type: application/json' \
   -d '{"id":"evt_dev2","type":"checkout.session.completed","data":{"object":{"id":"cs_dev","mode":"payment","payment_status":"paid","amount_total":1000,"metadata":{"kind":"topup","user_id":"<USER_ID>"}}}}'
 ```
-Stub mode is refused when `NODE_ENV=production` (as are the console OTP provider and the default internal token).
+Stub mode is refused when `NODE_ENV=production` (as are the console OTP provider and the default internal token). Placeholders `sk_test_placeholder`, `whsec_placeholder`, and `pk_test_placeholder` are not live keys.
 
 ## API summary
 | Method | Path | Notes |
 |---|---|---|
+| GET | `/healthz` | database ping; `{"ok":true}` |
 | POST | `/v1/auth/email/start`, `/v1/auth/email/verify` | sign-up/login, email KYC |
 | POST | `/v1/me/phone/start`, `/v1/me/phone/verify` | phone KYC |
 | GET | `/v1/me` | profile, KYC status, wallet, numbers |
@@ -101,9 +104,9 @@ Stub mode is refused when `NODE_ENV=production` (as are the console OTP provider
 `/internal/*` requires `Authorization: Bearer $INTERNAL_API_TOKEN` **and** a source IP in `INTERNAL_ALLOWED_IPS`.
 
 ## Open decisions (Umar)
-Launch countries · first DID pool size · retail rates + number prices (placeholders in migration 003) · edge/API server ·
+Tracked in [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md): launch countries · first DID pool size · retail rates + number prices (placeholders in migration 003) · edge/API server ·
 Stripe account · OTP/SMS provider for codes · KYC vendor for ID/address (or manual review) · Apple/Google developer
-accounts + Firebase (Phase 2) · SIPNAV "DG App" account, tech prefix, attestation.
+accounts + Firebase (Phase 2) · SIPNAV "DG App" account, tech prefix, attestation. Public DNS is not required for the isolated path.
 
 ## DID pool (Phase 1 ops)
 Numbers are sold from `did_pool`. Importing is a **DB-only** change; it never calls SIPNAV. Before importing,

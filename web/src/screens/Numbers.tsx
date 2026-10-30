@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, ApiError, type AvailableDid, type Me } from '../lib/api';
+import { simulateStripeEvent } from '../lib/stubStripe';
 
 const fmt = (e164: string) => (e164.startsWith('1') && e164.length === 11 ? `+1 (${e164.slice(1, 4)}) ${e164.slice(4, 7)}-${e164.slice(7)}` : `+${e164}`);
 
@@ -16,7 +17,21 @@ export default function Numbers({ me, onChange }: { me: Me; onChange: () => void
   };
   const buy = async (d: AvailableDid, billing: 'wallet' | 'stripe') => {
     try {
-      const r = await api<{ status: string; checkoutUrl?: string }>('/v1/dids/buy', { body: { didId: d.id, billing } });
+      const r = await api<{ status: string; checkoutUrl?: string; checkoutId?: string; stub?: boolean; assignmentId?: string; e164: string }>('/v1/dids/buy', { body: { didId: d.id, billing } });
+      if (r.stub && r.checkoutId && r.assignmentId) {
+        await simulateStripeEvent({
+          id: `evt_${r.checkoutId}`,
+          type: 'checkout.session.completed',
+          object: {
+            id: r.checkoutId, mode: 'subscription',
+            metadata: { kind: 'did_subscription', user_id: me.id, assignment_id: r.assignmentId },
+          },
+        });
+        setMsg(`${fmt(r.e164)} is yours (dev stub card).`);
+        onChange();
+        setResults([]);
+        return;
+      }
       if (r.checkoutUrl) window.location.href = r.checkoutUrl;
       else { setMsg(`${fmt(d.e164)} is yours.`); onChange(); setResults([]); }
     } catch (e) {
