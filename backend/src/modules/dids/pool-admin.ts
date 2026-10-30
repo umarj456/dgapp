@@ -48,20 +48,54 @@ export async function poolStats(db: Db) {
   return r.rows as { country: string; status: string; n: number }[];
 }
 
-/** Parse CSV: header row with e164,country,region,number_type,monthly_usd,setup_usd,sipnav_ref */
+/**
+ * Parse a DID pool CSV. Lines starting with # are comments.
+ * Required header: `e164` or `E.164`, `country`, and `monthly_price_cents` or `monthly_usd`.
+ * `monthly_price_cents` is a whole number of cents (500 = $5.00). Optional columns:
+ * `region`, `number_type`, `setup_price_cents` or `setup_usd`, `sipnav_ref`.
+ * This is a file parse only. It does not call SIPNAV.
+ */
 export function parsePoolCsv(text: string): PoolEntry[] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  if (lines.length === 0) return [];
   const [head, ...rows] = lines;
   const cols = head.split(',').map((c) => c.trim().toLowerCase());
+  if (!cols.includes('e164') && !cols.includes('e.164')) throw new Error('CSV header must include e164 or E.164');
+  if (!cols.includes('country')) throw new Error('CSV header must include country');
+  if (!cols.includes('monthly_price_cents') && !cols.includes('monthly_usd')) {
+    throw new Error('CSV header must include monthly_price_cents or monthly_usd');
+  }
   return rows.map((line, i) => {
+    const rowNo = i + 2;
     const v = line.split(',').map((c) => c.trim());
-    const g = (k: string) => { const j = cols.indexOf(k); return j >= 0 && v[j] !== '' ? v[j] : undefined; };
-    const usd = (k: string) => (g(k) === undefined ? undefined : Math.round(Number(g(k)) * 1_000_000));
+    const g = (...keys: string[]) => {
+      for (const k of keys) {
+        const j = cols.indexOf(k);
+        if (j >= 0 && v[j] !== undefined && v[j] !== '') return v[j];
+      }
+      return undefined;
+    };
+    const cents = (raw: string | undefined, label: string) => {
+      if (raw === undefined) return undefined;
+      if (!/^\d+$/.test(raw)) throw new Error(`CSV row ${rowNo}: ${label} must be a whole number of cents`);
+      return Number(raw) * 10_000;
+    };
+    const usd = (raw: string | undefined) => (raw === undefined ? undefined : Math.round(Number(raw) * 1_000_000));
+    const monthly = onePrice(cents(g('monthly_price_cents'), 'monthly_price_cents'), usd(g('monthly_usd')), 'monthly price', rowNo);
+    if (monthly === undefined) throw new Error(`CSV row ${rowNo}: monthly_price_cents or monthly_usd is required`);
+    const setup = onePrice(cents(g('setup_price_cents'), 'setup_price_cents'), usd(g('setup_usd')), 'setup price', rowNo);
     const p = poolEntrySchema.safeParse({
-      e164: g('e164'), country: g('country'), region: g('region'), numberType: g('number_type'),
-      monthlyPriceMicros: usd('monthly_usd'), setupPriceMicros: usd('setup_usd'), sipnavRef: g('sipnav_ref'),
+      e164: g('e164', 'e.164'), country: g('country'), region: g('region'), numberType: g('number_type'),
+      monthlyPriceMicros: monthly, setupPriceMicros: setup, sipnavRef: g('sipnav_ref'),
     });
-    if (!p.success) throw new Error(`CSV row ${i + 2}: ${p.error.issues.map((x) => `${x.path.join('.')}: ${x.message}`).join('; ')}`);
+    if (!p.success) throw new Error(`CSV row ${rowNo}: ${p.error.issues.map((x) => `${x.path.join('.')}: ${x.message}`).join('; ')}`);
     return p.data;
   });
+}
+
+function onePrice(fromCents: number | undefined, fromUsd: number | undefined, label: string, rowNo: number): number | undefined {
+  if (fromCents !== undefined && fromUsd !== undefined && fromCents !== fromUsd) {
+    throw new Error(`CSV row ${rowNo}: ${label} cents and usd columns disagree`);
+  }
+  return fromCents ?? fromUsd;
 }

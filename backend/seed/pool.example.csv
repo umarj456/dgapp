@@ -1,4 +1,8 @@
-# FAKE numbers (555-01xx fictional range). Replace with the real DG App block from SIPNAV.
-e164,country,region,number_type,monthly_usd,setup_usd,sipnav_ref
-12125550111,US,NY-212,local,5.00,0,
-13105550112,US,CA-310,local,5.00,0,
+# NOT real inventory. Fictional NANP 555-01xx numbers for the local stub test only.
+# Do not assign these on SIPNAV and do not route them.
+# When the team sends the real DG App block, import that file with the same command.
+# Required columns: E.164, country, monthly_price_cents (500 = $5.00).
+E.164,country,monthly_price_cents
+12125550121,US,500
+13105550122,US,500
+17135550123,US,500

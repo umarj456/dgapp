@@ -37,7 +37,7 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-dev-only}
       INTERNAL_ALLOWED_IPS: 127.0.0.1,::1,::ffff:127.0.0.1
-      SIPNAV_TECH_PREFIX: ${SIPNAV_TECH_PREFIX:-05436#}
+      SIPNAV_TECH_PREFIX: "${SIPNAV_TECH_PREFIX:-05436#}"
       SIP_REALM: ${SIP_REALM:-sip.dialergiants.example}
       SIP_WSS_URL: ${SIP_WSS_URL:-wss://sip.dialergiants.example:8443/ws}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
