@@ -1,6 +1,8 @@
 /** Import DIDs into the pool from a CSV file (DB only, no SIPNAV calls).
  *   npm run seed -- path/to/pool.csv
- * CSV header: e164,country,region,number_type,monthly_usd,setup_usd,sipnav_ref   (see seed/pool.example.csv) */
+ *   npm run seed:prod -- path/to/pool.csv
+ * Required header: e164 (or E.164), country, monthly_price_cents (or monthly_usd).
+ * The sample at seed/pool.example.csv is fictional 555 numbers, not SIPNAV inventory. */
 import { readFileSync } from 'node:fs';
 import { pool, tx } from './db.js';
 import { importPool, parsePoolCsv, poolStats } from './modules/dids/pool-admin.js';

@@ -29,6 +29,7 @@ export default function SignUp({ onSignedIn }: { onSignedIn: () => void }) {
         <button onClick={start} disabled={!email.includes('@')}>Email me a code</button>
       ) : (
         <>
+          <p className="muted">On a local install the code is in the API log (console OTP), on the line that starts with [otp:email].</p>
           <input inputMode="numeric" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} />
           <button onClick={verify} disabled={code.length !== 6}>Continue</button>
           <button className="secondary" onClick={() => setSent(false)}>Use a different email</button>

@@ -1,44 +1,73 @@
-# Local development only. No real credentials: everything here is a dev placeholder.
+# Local / dedicated-machine stack. No real credentials.
+# Published ports bind to loopback unless *_BIND is changed.
+# On a host that already runs other apps (see DEPLOY_LOCAL.md), do not use this
+# file: use the Node + dedicated Postgres path, and do not install Docker there.
+name: ${COMPOSE_PROJECT_NAME:-dgapp}
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: dgapp
-      POSTGRES_PASSWORD: dgapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dgapp}
       POSTGRES_DB: dgapp
-    ports: ["5432:5432"]
+    ports:
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dgapp"]
+      test: ["CMD-SHELL", "pg_isready -U dgapp -d dgapp"]
       interval: 3s
+      timeout: 5s
       retries: 20
+      start_period: 10s
 
   api:
     build: ./backend
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgres://dgapp:dgapp@postgres:5432/dgapp
-      MIGRATE_DEV_SEED: "true"          # loads fake 555-01xx DIDs + placeholder rates
-      OTP_PROVIDER: console             # OTP codes are printed in `docker compose logs api`
+      NODE_ENV: development          # required for console OTP + Stripe stub; production refuses both
+      HOST: 0.0.0.0                  # container interface; the host publish address is API_BIND
+      PORT: "8080"
+      DATABASE_URL: postgres://dgapp:${POSTGRES_PASSWORD:-dgapp}@postgres:5432/dgapp
+      MIGRATE_DEV_SEED: "true"       # fictional 555-01xx DIDs + placeholder rates
+      OTP_PROVIDER: console          # codes: docker compose logs -f api
       STRIPE_STUB_MODE: "true"
-      INTERNAL_API_TOKEN: change-me-dev-only
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-dev-only}
       INTERNAL_ALLOWED_IPS: 127.0.0.1,::1,::ffff:127.0.0.1
-      SIPNAV_TECH_PREFIX: "05436#"
-      SIP_REALM: sip.dialergiants.example
-      WEB_ORIGIN: http://localhost:5173
-    ports: ["8080:8080"]
+      SIPNAV_TECH_PREFIX: "${SIPNAV_TECH_PREFIX:-05436#}"
+      SIP_REALM: ${SIP_REALM:-sip.dialergiants.example}
+      SIP_WSS_URL: ${SIP_WSS_URL:-wss://sip.dialergiants.example:8443/ws}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
 
   web:
     image: node:20-alpine
     working_dir: /app
-    command: sh -c "npm ci && npx vite --host 0.0.0.0"
+    command: sh -c "npm ci && npx vite --host 0.0.0.0 --port 5173 --strictPort"
     environment:
       VITE_PROXY_TARGET: http://api:8080
+      VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
     volumes: ["./web:/app", "webmodules:/app/node_modules"]
-    depends_on: [api]
-    ports: ["5173:5173"]
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-5173}:5173"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
 
 volumes:
   webmodules:
