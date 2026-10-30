@@ -9,6 +9,7 @@ import { pool, tx } from '../db.js';
 import { safeEqual } from '../lib/crypto.js';
 import { authorizeOutbound, endCall, expireStaleAuthorizations, lookupInbound } from './calls/service.js';
 import { runDidMaintenance } from './dids/service.js';
+import { importPool, poolEntrySchema, poolStats, setPoolStatus } from './dids/pool-admin.js';
 import { recordKycCheck } from './kyc/repo.js';
 import { lookupHa1 } from './sip/service.js';
 
@@ -72,6 +73,22 @@ export async function internalRoutes(app: FastifyInstance) {
   });
 
   // Ops / cron: renewals, cooldown recycling, stale hold release.
+  // ---- DID pool admin (DB only; never calls SIPNAV) ----
+  app.get('/internal/v1/dids/pool', async () => poolStats(pool));
+
+  app.post('/internal/v1/dids/pool/import', async (req) => {
+    const b = z.object({ numbers: z.array(poolEntrySchema).min(1).max(5000) }).parse(req.body);
+    return tx((c) => importPool(c, b.numbers));
+  });
+
+  app.post('/internal/v1/dids/pool/:e164/status', async (req, reply) => {
+    const { e164 } = z.object({ e164: z.string() }).parse(req.params);
+    const { status } = z.object({ status: z.enum(['disabled', 'available']) }).parse(req.body);
+    const r = await setPoolStatus(pool, e164, status);
+    if (!r) return reply.code(409).send({ error: 'not_changeable', details: 'unknown number or currently assigned/reserved' });
+    return r;
+  });
+
   app.post('/internal/v1/jobs/maintenance', async () => {
     await tx((c) => runDidMaintenance(c));
     const expired = await tx((c) => expireStaleAuthorizations(c));

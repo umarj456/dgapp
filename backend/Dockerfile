@@ -13,6 +13,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY migrations ./migrations
+COPY seed ./seed
 USER node
 EXPOSE 8080
 CMD ["sh", "-c", "node dist/migrate.js && node dist/server.js"]

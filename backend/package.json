@@ -12,6 +12,7 @@
     "migrate": "tsx src/migrate.ts",
     "migrate:prod": "node dist/migrate.js",
     "seed": "tsx src/seed.ts",
+    "seed:prod": "node dist/seed.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

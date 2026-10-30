@@ -124,6 +124,19 @@ d('API integration (real Postgres)', () => {
     expect((await authorize('12125550199', 'c-6')).json()).toMatchObject({ allow: 0, code: 'insufficient_balance', sip_code: 402 });
   });
 
+  it('imports DIDs into the pool via the internal admin API and can disable them', async () => {
+    const imp = await app.inject({ method: 'POST', url: '/internal/v1/dids/pool/import', headers: I, payload: { numbers: [
+      { e164: '+1 (646) 555-0199', country: 'us', region: 'NY-646', monthlyPriceMicros: 5000000 },
+    ] } });
+    expect(imp.json()).toEqual({ inserted: 1, updated: 0 });
+    const again = await app.inject({ method: 'POST', url: '/internal/v1/dids/pool/import', headers: I, payload: { numbers: [{ e164: '16465550199', country: 'US', monthlyPriceMicros: 6000000 }] } });
+    expect(again.json()).toEqual({ inserted: 0, updated: 1 });
+    expect((await app.inject({ method: 'POST', url: '/internal/v1/dids/pool/16465550199/status', headers: I, payload: { status: 'disabled' } })).json().status).toBe('disabled');
+    expect((await app.inject({ method: 'POST', url: `/internal/v1/dids/pool/${didE164}/status`, headers: I, payload: { status: 'disabled' } })).statusCode).toBe(409);
+    expect((await app.inject({ url: '/internal/v1/dids/pool', headers: I })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/internal/v1/dids/pool', headers: H() })).statusCode).toBe(403);
+  });
+
   it('releases a number into cooldown and runs maintenance', async () => {
     const mine = (await app.inject({ url: '/v1/dids/mine', headers: H() })).json();
     expect((await app.inject({ method: 'POST', url: `/v1/dids/${mine[0].assignment_id}/release`, headers: H() })).statusCode).toBe(200);

@@ -30,5 +30,16 @@ services:
       WEB_ORIGIN: http://localhost:5173
     ports: ["8080:8080"]
 
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npx vite --host 0.0.0.0"
+    environment:
+      VITE_PROXY_TARGET: http://api:8080
+    volumes: ["./web:/app", "webmodules:/app/node_modules"]
+    depends_on: [api]
+    ports: ["5173:5173"]
+
 volumes:
+  webmodules:
   pgdata:
