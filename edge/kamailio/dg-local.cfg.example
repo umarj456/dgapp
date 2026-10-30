@@ -1,12 +1,38 @@
-# Copy to /etc/kamailio/dg-local.cfg on the edge server (chmod 640, owner kamailio). NOT in git.
-# All values are PLACEHOLDERS until Umar approves the server and the SIPNAV "DG App" account.
-#!substdef "!EDGE_PUBLIC_IP!203.0.113.10!g"
-#!substdef "!EDGE_PRIVATE_IP!10.0.0.10!g"
-#!substdef "!SIP_DOMAIN!sip.dialergiants.com!g"
-# SIPNAV signalling IP that sends inbound DIDs / receives our outbound (from SIPNAV endpoint page)
-#!substdef "!SIPNAV_IP!198.51.100.20!g"
+# Lab values for 138.201.138.161. Copy to /etc/kamailio/dg-local.cfg (chmod 640, root:kamailio).
+# Do not commit the copied file if you replace the token. This example stays in git.
+# substdef uses ! as the delimiter, so none of these values may contain !.
+#
+# This host has one public address on the NIC (survey). Listen and advertise that address.
+# If a private NIC is added later, set EDGE_PRIVATE_IP to it and leave EDGE_PUBLIC_IP as the public address.
+#!substdef "!EDGE_PUBLIC_IP!138.201.138.161!g"
+#!substdef "!EDGE_PRIVATE_IP!138.201.138.161!g"
+#
+# Do not use 5060 (Asterisk) or 8443 (dialer-monitor) or 8080 (DID portal nginx).
+# Confirm with `ss` that 15060/udp and 18443/tcp are free before starting. SIPNAV must be told UDP 15060.
+#!substdef "!EDGE_SIP_PORT!15060!g"
+#!substdef "!EDGE_WSS_PORT!18443!g"
+#
+# No-DNS lab: the digest realm is the IP. It must equal the API's SIP_REALM or every REGISTER fails.
+# sip.dialergiants.com stays optional until DNS and a public certificate exist.
+#!substdef "!SIP_DOMAIN!138.201.138.161!g"
+#
+# SIPNAV signalling address. Default until LEAD confirms the DG App account's switch IP.
+# SIPNAV_PORT is their port, not ours.
+#!substdef "!SIPNAV_IP!88.151.129.15!g"
 #!substdef "!SIPNAV_PORT!5060!g"
-# DG App API over the private network
-#!substdef "!API_URL!http://10.0.0.2:8080!g"
-# Same value as INTERNAL_API_TOKEN in the API .env
-#!substdef "!API_TOKEN!REPLACE_WITH_INTERNAL_API_TOKEN!g"
+#
+# Test API on this same host (DEPLOY_LOCAL.md). Loopback so INTERNAL_ALLOWED_IPS matches 127.0.0.1.
+#!substdef "!API_URL!http://127.0.0.1:4100!g"
+# Same string as INTERNAL_API_TOKEN in /opt/dgapp-test/app/backend/.env.
+# The value below is the repo placeholder, not a live secret. Replace both sides together.
+# Do not put the replacement in git.
+#!substdef "!API_TOKEN!change-me-dev-only!g"
+#
+# WebSocket Origin allow-list (the page that loads SIP.js, not the WSS URL).
+#!substdef "!WS_ORIGIN_1!http://127.0.0.1:4200!g"
+#!substdef "!WS_ORIGIN_2!http://127.0.0.1:5173!g"
+#!substdef "!WS_ORIGIN_3!capacitor://localhost!g"
+#!substdef "!WS_ORIGIN_4!https://app.dialergiants.com!g"
+#
+# Tech prefix is not set in Kamailio. The API puts it on ruri_user.
+# Until LEAD confirms, the API .env value is SIPNAV_TECH_PREFIX="05436#" (quotes required).

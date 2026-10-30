@@ -14,6 +14,7 @@ dg-app/
 ├── TESTING.md            local signup → stub Stripe → buy a fake 555 number
 ├── TEST_FLOW.md          the same path as curl, plus the seed command
 ├── GO_LIVE_CHECKLIST.md  repo-ready items vs what Umar still has to provide
+├── EDGE_DEPLOY.md        lab Kamailio + rtpengine on 138 (not installed)
 ├── .env.example          Compose placeholders (loopback binds, Stripe test-key placeholders)
 ├── docker-compose.yml    dedicated machine: postgres + api + web (loopback ports, health checks)
 ├── backend/              Node 20 + TypeScript + Fastify + Postgres
@@ -28,7 +29,7 @@ dg-app/
 │   │   ├── calls/        edge call control: authorize, inbound DID lookup, end-of-call settle + CDR
 │   │   └── sip/          per-device SIP credentials (HA1 only stored)
 │   └── test/             unit tests + end-to-end integration test (real Postgres, optional)
-├── edge/                 Kamailio + rtpengine WebRTC edge config: DRAFT, see edge/README.md
+├── edge/                 Kamailio + rtpengine lab config for 138, see EDGE_DEPLOY.md
 └── web/                  React + SIP.js client: sign-up, KYC, number picker, wallet, dialer, incoming call
 ```
 
