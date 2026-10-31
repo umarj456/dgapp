@@ -27,15 +27,15 @@ export async function didCountry(db: Db, didId: string): Promise<string | null> 
   return r.rowCount ? r.rows[0].country : null;
 }
 
-function addMonth(d: Date): Date {
-  const n = new Date(d);
-  n.setUTCMonth(n.getUTCMonth() + 1);
-  return n;
+export const SUBSCRIPTION_DAYS = 30;
+
+export function addSubscriptionPeriod(from = new Date()): Date {
+  return new Date(from.getTime() + SUBSCRIPTION_DAYS * 86_400_000);
 }
 
 /**
- * Buy from the pool. 'wallet': first month + setup debited from prepaid balance and the number is live immediately.
- * 'stripe': number is reserved (pending_payment) until the Stripe checkout webhook activates it.
+ * Buy from the pool. 'wallet': 30 days + setup debited from calling credit and the number is live immediately.
+ * 'stripe' or 'paypal': reserved until that checkout completes, then live for 30 days.
  * No SIPNAV change is needed: the whole pool already routes to the DG App account.
  */
 export async function buyDid(c: pg.PoolClient, userId: string, didId: string, billing: 'wallet' | 'stripe' | 'paypal') {
@@ -51,11 +51,11 @@ export async function buyDid(c: pg.PoolClient, userId: string, didId: string, bi
     const a = await c.query(
       `INSERT INTO did_assignments (did_id, user_id, status, billing_source, current_period_end, is_primary_cid)
        VALUES ($1,$2,'active','wallet',$3,$4) RETURNING id`,
-      [didId, userId, addMonth(now), !hasPrimary.rowCount],
+      [didId, userId, addSubscriptionPeriod(now), !hasPrimary.rowCount],
     );
     const assignmentId = a.rows[0].id;
     await postLedger(c, userId, 'did_subscription', -total, {
-      refType: 'did_assignment', refId: assignmentId, idempotencyKey: `did:${assignmentId}:first`, memo: `+${did.e164} first month`,
+      refType: 'did_assignment', refId: assignmentId, idempotencyKey: `did:${assignmentId}:first`, memo: `+${did.e164} 30 days`,
     });
     await c.query(`UPDATE did_pool SET status='assigned', updated_at=now() WHERE id=$1`, [didId]);
     return { assignmentId, e164: did.e164, status: 'active' as const };
@@ -67,6 +67,42 @@ export async function buyDid(c: pg.PoolClient, userId: string, didId: string, bi
   );
   await c.query(`UPDATE did_pool SET status='reserved', updated_at=now() WHERE id=$1`, [didId]);
   return { assignmentId: a.rows[0].id as string, e164: did.e164 as string, status: 'pending_payment' as const, monthlyMicros: Number(did.monthly_price_micros) };
+}
+
+/** Cancel keeps the number until period end. on=false stops the next renewal. */
+export async function setAutoRenew(c: pg.PoolClient, assignmentId: string, userId: string, on: boolean) {
+  const r = await c.query(
+    `UPDATE did_assignments SET auto_renew=$3
+      WHERE id=$1 AND user_id=$2 AND status IN ('active','past_due')
+      RETURNING stripe_subscription_id`,
+    [assignmentId, userId, on],
+  );
+  if (!r.rowCount) throw new HttpError(404, 'assignment_not_found');
+  return (r.rows[0].stripe_subscription_id as string | null) ?? null;
+}
+
+/** Pay another 30 days from calling credit and unblock the number. */
+export async function renewFromWallet(c: pg.PoolClient, userId: string, assignmentId: string) {
+  const r = await c.query(
+    `SELECT a.id, a.status, p.e164, p.monthly_price_micros
+       FROM did_assignments a JOIN did_pool p ON p.id=a.did_id
+      WHERE a.id=$1 AND a.user_id=$2 AND a.status IN ('active','past_due')
+      FOR UPDATE OF a`,
+    [assignmentId, userId],
+  );
+  if (!r.rowCount) throw new HttpError(404, 'assignment_not_found');
+  const row = r.rows[0];
+  const periodKey = new Date().toISOString().slice(0, 16);
+  await postLedger(c, userId, 'did_subscription', -Number(row.monthly_price_micros), {
+    refType: 'did_assignment', refId: assignmentId, idempotencyKey: `did:${assignmentId}:renew:${periodKey}`, memo: `+${row.e164} 30 days`,
+  });
+  const end = addSubscriptionPeriod();
+  await c.query(
+    `UPDATE did_assignments SET status='active', auto_renew=true, billing_source='wallet', current_period_end=$2 WHERE id=$1`,
+    [assignmentId, end],
+  );
+  await c.query(`UPDATE did_pool SET status='assigned', updated_at=now() WHERE e164=$1`, [row.e164]);
+  return { assignmentId, e164: row.e164 as string, status: 'active' as const, monthlyMicros: Number(row.monthly_price_micros) };
 }
 
 /** Checkout failed before the payer approved. Put the number back on sale. */
@@ -97,8 +133,8 @@ export async function releaseAssignment(db: Db, assignmentId: string, userId?: s
 
 export async function activateStripeAssignment(db: Db, assignmentId: string, subscriptionId: string | null, periodEnd: Date | null) {
   const r = await db.query(
-    `UPDATE did_assignments SET status='active', stripe_subscription_id=COALESCE($2, stripe_subscription_id),
-            current_period_end=COALESCE($3, now() + interval '1 month')
+    `UPDATE did_assignments SET status='active', auto_renew=true, stripe_subscription_id=COALESCE($2, stripe_subscription_id),
+            current_period_end=COALESCE($3, now() + interval '30 days')
       WHERE id=$1 AND status IN ('pending_payment','past_due') RETURNING did_id`,
     [assignmentId, subscriptionId, periodEnd],
   );
@@ -107,7 +143,7 @@ export async function activateStripeAssignment(db: Db, assignmentId: string, sub
 
 export async function myNumbers(db: Db, userId: string) {
   const r = await db.query(
-    `SELECT a.id AS assignment_id, p.e164, p.country, p.region, a.status, a.billing_source, a.current_period_end, a.is_primary_cid
+    `SELECT a.id AS assignment_id, p.e164, p.country, p.region, a.status, a.billing_source, a.auto_renew, a.current_period_end, a.is_primary_cid
        FROM did_assignments a JOIN did_pool p ON p.id=a.did_id
       WHERE a.user_id=$1 AND a.status<>'released' ORDER BY a.created_at`,
     [userId],
@@ -115,29 +151,43 @@ export async function myNumbers(db: Db, userId: string) {
   return r.rows;
 }
 
-/** Daily job: renew wallet-billed numbers; past_due when balance is short; release after 7-day grace. Cooldown numbers return to pool. */
+const GRACE_MS = 7 * 86_400_000;
+
+/** Daily job. Wallet auto-renew charges calling credit. Anything else blocks at period end. Blocked numbers release after 7 days. */
 export async function runDidMaintenance(c: pg.PoolClient) {
   const due = await c.query(
-    `SELECT a.id, a.user_id, p.e164, p.monthly_price_micros, a.status, a.current_period_end
+    `SELECT a.id, a.user_id, a.billing_source, a.auto_renew, a.status, a.stripe_subscription_id,
+            a.current_period_end, p.e164, p.monthly_price_micros
        FROM did_assignments a JOIN did_pool p ON p.id=a.did_id
-      WHERE a.billing_source='wallet' AND a.status IN ('active','past_due') AND a.current_period_end <= now()
+      WHERE a.status IN ('active','past_due') AND a.current_period_end IS NOT NULL AND a.current_period_end <= now()
       FOR UPDATE OF a`,
   );
   for (const row of due.rows) {
+    const ended = new Date(row.current_period_end).getTime();
+    const graceOver = Date.now() - ended > GRACE_MS;
+    if (row.status === 'past_due') {
+      if (graceOver) await releaseAssignment(c, row.id);
+      continue;
+    }
+    const walletRenew = row.billing_source === 'wallet' && row.auto_renew;
+    const liveStripe = row.billing_source === 'stripe' && row.auto_renew && row.stripe_subscription_id;
+    if (liveStripe) continue;
+    if (!walletRenew) {
+      await c.query(`UPDATE did_assignments SET status='past_due' WHERE id=$1`, [row.id]);
+      continue;
+    }
     const periodKey = new Date(row.current_period_end).toISOString().slice(0, 10);
     try {
       await c.query('SAVEPOINT renew');
       await postLedger(c, row.user_id, 'did_subscription', -Number(row.monthly_price_micros), {
-        refType: 'did_assignment', refId: row.id, idempotencyKey: `did:${row.id}:${periodKey}`, memo: `+${row.e164} renewal`,
+        refType: 'did_assignment', refId: row.id, idempotencyKey: `did:${row.id}:${periodKey}`, memo: `+${row.e164} 30 days`,
       });
-      await c.query(`UPDATE did_assignments SET status='active', current_period_end=current_period_end + interval '1 month' WHERE id=$1`, [row.id]);
+      await c.query(`UPDATE did_assignments SET status='active', current_period_end=current_period_end + interval '30 days' WHERE id=$1`, [row.id]);
       await c.query('RELEASE SAVEPOINT renew');
     } catch (e) {
       await c.query('ROLLBACK TO SAVEPOINT renew');
       if (e instanceof HttpError && e.code === 'insufficient_balance') {
-        const graceOver = Date.now() - new Date(row.current_period_end).getTime() > 7 * 86_400_000;
-        if (graceOver) await releaseAssignment(c, row.id);
-        else await c.query(`UPDATE did_assignments SET status='past_due' WHERE id=$1`, [row.id]);
+        await c.query(`UPDATE did_assignments SET status='past_due' WHERE id=$1`, [row.id]);
       } else throw e;
     }
   }

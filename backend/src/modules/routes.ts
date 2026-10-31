@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { pool, tx } from '../db.js';
 import { HttpError } from '../lib/errors.js';
 import { authenticate } from './auth/plugin.js';
-import { abandonPendingPayment, buyDid, didCountry, myNumbers, releaseAssignment, searchAvailable } from './dids/service.js';
+import { abandonPendingPayment, buyDid, didCountry, myNumbers, releaseAssignment, renewFromWallet, searchAvailable, setAutoRenew } from './dids/service.js';
 import { evaluateKyc, latestByType } from './kyc/gate.js';
 import { requireKyc, type KycDeps } from './kyc/middleware.js';
 import { loadCountryRequirement, loadKycChecks, recordKycCheck } from './kyc/repo.js';
@@ -13,7 +13,7 @@ import { issueDeviceCredential, revokeDeviceCredential } from './sip/service.js'
 import { getWallet, microsToUsd, postLedger, usdToMicros } from './wallet/repo.js';
 import { isStripePublishableKey } from './wallet/keys.js';
 import { capturePayPalOrder, createPayPalOrder, encodePayPalCustom, paypalConfigured, planPayPalCapture } from './wallet/paypal.js';
-import { createDidSubscriptionCheckout, createSetupIntent, createTopupCheckout, ensureCustomer } from './wallet/stripe.js';
+import { createDidSubscriptionCheckout, createSetupIntent, createTopupCheckout, ensureCustomer, stripe as stripeClient } from './wallet/stripe.js';
 import { activateStripeAssignment } from './dids/service.js';
 
 export const kycDeps: KycDeps = {
@@ -120,6 +120,59 @@ export async function userRoutes(app: FastifyInstance) {
     return { released: true };
   });
 
+  app.post('/v1/dids/:assignmentId/auto-renew', { preHandler: auth }, async (req) => {
+    const { assignmentId } = z.object({ assignmentId: z.string().uuid() }).parse(req.params);
+    const b = z.object({ on: z.boolean() }).parse(req.body);
+    const subId = await tx((c) => setAutoRenew(c, assignmentId, req.user!.id, b.on));
+    const s = stripeClient();
+    if (s && subId) await s.subscriptions.update(subId, { cancel_at_period_end: !b.on });
+    return { autoRenew: b.on };
+  });
+
+  app.post('/v1/dids/:assignmentId/renew', { preHandler: auth }, async (req) => {
+    const { assignmentId } = z.object({ assignmentId: z.string().uuid() }).parse(req.params);
+    const b = z.object({ billing: z.enum(['wallet', 'stripe', 'paypal']).default('stripe') }).parse(req.body ?? {});
+    if (b.billing === 'wallet') return tx((c) => renewFromWallet(c, req.user!.id, assignmentId));
+    const row = await pool.query(
+      `SELECT a.id, a.status, p.e164, p.monthly_price_micros
+         FROM did_assignments a JOIN did_pool p ON p.id=a.did_id
+        WHERE a.id=$1 AND a.user_id=$2 AND a.status IN ('active','past_due')`,
+      [assignmentId, req.user!.id],
+    );
+    if (!row.rowCount) throw new HttpError(404, 'assignment_not_found');
+    const due = Number(row.rows[0].monthly_price_micros);
+    if (b.billing === 'paypal') {
+      if (!paypalConfigured()) throw new HttpError(503, 'paypal_not_configured');
+      const order = await createPayPalOrder({
+        customId: encodePayPalCustom('did', req.user!.id, assignmentId),
+        amountMicros: due,
+        description: `Phone number +${row.rows[0].e164}`,
+        returnUrl: `${config.WEB_ORIGIN}/?paypal=return`,
+        cancelUrl: `${config.WEB_ORIGIN}/?buy=cancel`,
+      });
+      return { status: row.rows[0].status, checkoutUrl: order.url, checkoutId: order.id, stub: false, provider: 'paypal' as const, e164: row.rows[0].e164, assignmentId };
+    }
+    const cust = await stripeCustomer(req.user!.id, req.user!.email);
+    const co = await createDidSubscriptionCheckout(req.user!.id, cust, assignmentId, row.rows[0].e164, due);
+    return { status: row.rows[0].status, checkoutUrl: co.url, checkoutId: co.id, stub: co.stub, e164: row.rows[0].e164, assignmentId };
+  });
+
+  app.get('/v1/calls', { preHandler: auth }, async (req) => {
+    const r = await pool.query(
+      `SELECT id, direction, caller_id, destination, billsec, charged_micros, created_at
+         FROM cdrs WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
+      [req.user!.id],
+    );
+    return r.rows.map((row) => ({
+      id: row.id,
+      direction: row.direction,
+      number: row.direction === 'inbound' ? row.caller_id : row.destination,
+      seconds: row.billsec,
+      costUsd: microsToUsd(Number(row.charged_micros)),
+      at: row.created_at,
+    }));
+  });
+
   // ---- Wallet ----
   app.get('/v1/wallet/ledger', { preHandler: auth }, async (req) => {
     const r = await pool.query(
@@ -171,7 +224,7 @@ export async function userRoutes(app: FastifyInstance) {
       const row = await c.query(
         `SELECT a.id, p.monthly_price_micros + p.setup_price_micros AS due
            FROM did_assignments a JOIN did_pool p ON p.id = a.did_id
-          WHERE a.id=$1 AND a.user_id=$2 AND a.status='pending_payment' AND a.billing_source='paypal'`,
+          WHERE a.id=$1 AND a.user_id=$2 AND a.status IN ('pending_payment','past_due')`,
         [plan.assignmentId, plan.userId],
       );
       if (!row.rowCount) throw new HttpError(409, 'paypal_assignment_missing');

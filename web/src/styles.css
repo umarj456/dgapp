@@ -12,6 +12,7 @@ button:disabled { opacity: .5; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .keypad button { font-size: 22px; padding: 14px; background: #eef1f7; color: #111; }
 .ok { color: #067647; } .bad { color: #b42318; } .muted { color: #667085; font-size: 13px; }
+button.picked { outline: 2px solid #0b5fff; }
 .tabs { display: flex; gap: 4px; margin-bottom: 12px; } .tabs button { padding: 8px; }
 .tabs button.active { background: #0b5fff; } .tabs button:not(.active) { background: #dde3ee; color: #111; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }

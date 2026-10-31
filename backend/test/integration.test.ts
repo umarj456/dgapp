@@ -45,7 +45,8 @@ d('API integration (real Postgres)', () => {
     token = res.json().token;
     const me = (await app.inject({ url: '/v1/me', headers: H() })).json();
     userId = me.id; aor = me.sipAor;
-    expect(me.kyc).toMatchObject({ canCall: false, missing: ['phone', 'payment_method'] });
+    expect(me.numbers).toEqual([]);
+    expect(me.kyc).toMatchObject({ canCall: false, missing: ['phone'] });
   });
 
   it('issues SIP device credentials and serves HA1 to the edge only', async () => {
@@ -70,6 +71,7 @@ d('API integration (real Postgres)', () => {
     await app.inject({ method: 'POST', url: '/v1/me/phone/start', headers: H(), payload: { phone: '+923001234567' } });
     const code = otp.last.get('+923001234567');
     expect((await app.inject({ method: 'POST', url: '/v1/me/phone/verify', headers: H(), payload: { phone: '+923001234567', code } })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/v1/me', headers: H() })).json().kyc.canCall).toBe(true);
     await webhook({ id: 'evt_1', type: 'setup_intent.succeeded', data: { object: { id: 'seti_1', metadata: { user_id: userId } } } });
     const topup = { id: 'evt_2', type: 'checkout.session.completed', data: { object: { id: 'cs_1', mode: 'payment', payment_status: 'paid', amount_total: 1000, metadata: { kind: 'topup', user_id: userId } } } };
     expect((await webhook(topup)).json().duplicate).toBe(false);
@@ -86,6 +88,11 @@ d('API integration (real Postgres)', () => {
     expect(buy.statusCode).toBe(200);
     didE164 = buy.json().e164;
     expect((await app.inject({ method: 'POST', url: '/v1/dids/buy', headers: H(), payload: { didId: did.id } })).statusCode).toBe(409);
+    const mine = (await app.inject({ url: '/v1/dids/mine', headers: H() })).json();
+    expect(mine[0].auto_renew).toBe(true);
+    const daysLeft = (new Date(mine[0].current_period_end).getTime() - Date.now()) / 86_400_000;
+    expect(daysLeft).toBeGreaterThan(29);
+    expect(daysLeft).toBeLessThan(31);
     expect((await app.inject({ url: '/v1/me', headers: H() })).json().wallet.balanceUsd).toBe('5.0000');
   });
 

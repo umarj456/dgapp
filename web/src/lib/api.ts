@@ -23,7 +23,7 @@ export interface Me {
   id: string; email: string; sipAor: string;
   kyc: { checks: Record<string, string>; canCall: boolean; missing: string[]; failed: string[] };
   wallet: { balanceUsd: string; availableUsd: string; currency: string } | null;
-  numbers: { assignment_id: string; e164: string; country: string; region: string; status: string; is_primary_cid: boolean }[];
+  numbers: { assignment_id: string; e164: string; country: string; region: string; status: string; auto_renew: boolean; current_period_end: string | null; is_primary_cid: boolean }[];
 }
 
 export interface AvailableDid {

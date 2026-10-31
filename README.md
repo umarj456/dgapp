@@ -34,9 +34,7 @@ dg-app/
 ```
 
 ## Business rules enforced in code (approved by Umar)
-- **KYC before anything**: no DID purchase and no call until email OTP + phone OTP + verified payment method pass.
-  ID and/or address are added per DID country (`did_country_requirements`). Enforced server-side twice:
-  the `requireKyc` preHandler on `/v1/dids/buy` and inside `authorizeOutbound` for every call.
+- **Phone before a number or a call**: email OTP logs you in. Confirming a phone is required before subscribing to a number or placing a call. A card is not collected at signup. The number is a separate 30-day payment. Calling credit is a separate wallet. ID and/or address still apply per DID country (`did_country_requirements`), on `/v1/dids/buy` and inside `authorizeOutbound`.
 - **Prepaid only**: wallet has a DB constraint `balance >= 0, held <= balance`. Each call places a hold sized to the
   max duration the available balance allows, the edge hard-stops the call at that duration, and settlement never
   charges more than the hold. Zero balance = call refused (SIP 402).

@@ -24,7 +24,7 @@ Not done by this repo. Do not install Docker on `138.201.138.161`. Do not change
 - [ ] Start a **new** Postgres data directory on `127.0.0.1:5433` (`initdb` as that user). Leave the live cluster on `5432` alone.
 - [ ] `npm ci`, migrate, and run the API on `127.0.0.1:4100` and the web UI on `127.0.0.1:4200` as `dgapptest`.
 - [ ] `curl -fsS http://127.0.0.1:4100/healthz` returns `{"ok":true}`.
-- [ ] Sign up through an SSH tunnel, read the OTP from the API log, and confirm the Stripe stub marks the payment method and a top-up.
+- [ ] Sign up through an SSH tunnel, read the OTP from the API log, browse US numbers, subscribe for 30 days, and top up calling credit separately.
 - [ ] Keep `NODE_ENV=development` until real OTP delivery and real Stripe keys exist.
 
 A private-IP lab (still no public DNS) is the same build with `WEB_ORIGIN` set to `http://<private-ip>:<port>`. The Kamailio lab install is [`EDGE_DEPLOY.md`](EDGE_DEPLOY.md). It is not started until Umar says go.
