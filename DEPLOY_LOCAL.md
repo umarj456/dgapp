@@ -95,7 +95,7 @@ Vite listens on `127.0.0.1:4200` and proxies `/v1` to `127.0.0.1:4100`. From a l
 ssh -L 4200:127.0.0.1:4200 <user>@<host>
 ```
 
-Open `http://127.0.0.1:4200`. That URL must equal `WEB_ORIGIN`. Sign-up reads the email code from the API log. Phone verification reads the SMS code from the same log. "Add a card" and "Add credit" complete through the Stripe stub (no Stripe network call). `pk_test_placeholder` / `sk_test_placeholder` / `whsec_placeholder` are not accounts.
+Open `http://127.0.0.1:4200`. That URL must equal `WEB_ORIGIN`. Sign-up and phone codes are in the API log. After login you browse numbers, then pay for a 30-day subscription. Calling credit is a separate wallet top-up. `pk_test_placeholder` / `sk_test_placeholder` / `whsec_placeholder` are not accounts.
 
 Leave the two processes under `dgapptest` (a terminal or a **user** service). Do not `pm2 start` as root.
 

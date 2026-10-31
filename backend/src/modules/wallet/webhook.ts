@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { activateStripeAssignment, releaseAssignment } from '../dids/service.js';
+import { activateStripeAssignment } from '../dids/service.js';
 import { recordKycCheck } from '../kyc/repo.js';
 import { postLedger } from './repo.js';
 import type { WebhookEvent } from './stripe.js';
@@ -53,8 +53,11 @@ export async function handleStripeEvent(c: pg.PoolClient, ev: WebhookEvent): Pro
       break;
     }
     case 'customer.subscription.deleted': {
-      const a = await c.query(`SELECT id FROM did_assignments WHERE stripe_subscription_id=$1 AND status<>'released'`, [o.id]);
-      if (a.rowCount) await releaseAssignment(c, a.rows[0].id);
+      await c.query(
+        `UPDATE did_assignments SET status='past_due', auto_renew=false
+          WHERE stripe_subscription_id=$1 AND status='active'`,
+        [o.id],
+      );
       break;
     }
     case 'charge.dispute.created': {

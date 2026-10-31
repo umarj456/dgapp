@@ -138,7 +138,7 @@ export async function lookupInbound(db: Db, didRaw: string, callId: string, from
   if (tp && did.startsWith(tp)) did = did.slice(tp.length);
   const r = await db.query(
     `SELECT u.id, u.sip_aor, u.status FROM did_pool p
-       JOIN did_assignments a ON a.did_id=p.id AND a.status IN ('active','past_due')
+       JOIN did_assignments a ON a.did_id=p.id AND a.status='active'
        JOIN users u ON u.id=a.user_id
       WHERE p.e164=$1`,
     [did],

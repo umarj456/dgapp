@@ -36,17 +36,15 @@ Docker: `docker compose exec api npm run seed:prod -- seed/pool.example.csv`.
 ## Clicks
 
 1. **Email me a code.** Read `[otp:email] login code for <you>: 123456` in the API log. Enter it. **Continue.**
-2. On Verify, enter a phone such as `+15555550199`. **Text me a code.** Read `[otp:sms] verify_phone code for +15555550199: 123456`. **Verify.**
-3. **Add a card.** The stub posts `setup_intent.succeeded`. The screen says `Dev stub recorded a verified payment method.` and **Payment method verified: passed.**
-4. Open **Wallet**. Leave **$10**. **Add credit.** The stub posts `checkout.session.completed` (`kind: topup`, `amount_total` 1000 cents). Balance reads `Balance: $10.0000`.
-5. Open **Numbers**. Country **United States**, digits `555`, **Search**. **Pay from balance** on a `$5.0000/mo` row. It appears under **My numbers** as `active`, and the balance drops by $5.
-6. Optional card purchase: **Subscribe by card** on another row. The stub posts `checkout.session.completed` with `kind: did_subscription` and the message ends with `(dev stub card)`. No Stripe page opens.
+2. You land on **Numbers**. Search area code `212`, pick a row, and confirm your phone (`+15555550199`). The code is the API log line `[otp:sms] verify_phone code for +15555550199: 123456`. **Confirm**, then **Pay by card**.
+3. The number shows under **My numbers** as **Active**, auto-renew on, for 30 days. Calling credit is not charged for the number.
+4. Open **Wallet**. Leave **$10**. **Add calling credit.** The line reads `Calling credit 10.00` and keeps updating while that page is open.
 
 No card number is collected. The same webhook bodies, sent by hand, are in `TEST_FLOW.md`.
 
 ## What will not work yet
 
-- **Dialer audio, inbound ringing, and registration.** After verification the Dialer tab tries `wss://sip.dialergiants.example:8443/ws` and shows `error`. There is no Kamailio edge and no SIPNAV route. A bought 555 number is a database row, not a carrier number.
+- **Dialer audio, inbound ringing, and registration.** The Dialer shows **Can't connect**. There is no Kamailio edge and no SIPNAV route in this lab. A bought 555 number is a database row, not a carrier number. The screen does not show SIP codes or socket errors.
 - **Real email or SMS.** Codes exist only in the API log.
 - **Real charges, refunds, or Stripe webhooks from Stripe.** The stub accepts unsigned JSON and is refused when `NODE_ENV=production`.
 - **Calling another person, caller ID on the PSTN, and porting.** Those wait on the SIPNAV DG App account, a real DID file, and the edge host in `GO_LIVE_CHECKLIST.md`.

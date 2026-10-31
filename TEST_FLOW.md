@@ -39,16 +39,11 @@ Optional columns, if that file has them: `region`, `number_type`, `setup_price_c
 
 1. Open the UI URL. Type an email such as `you@example.com`. Click **Email me a code**.
 2. Read the API log line `[otp:email] login code for you@example.com: 123456`. Type those 6 digits. Click **Continue**.
-3. The Verify screen shows **Email verified: passed**. Type a phone in E.164, for example `+15555550199`. Click **Text me a code**.
-4. Read `[otp:sms] verify_phone code for +15555550199: 123456`. Type it. Click **Verify**. **Phone number verified: passed**.
-5. Click **Add a card**. Stub mode posts `setup_intent.succeeded` for you. The line **Payment method verified: passed** appears, then **All set. You can buy a number and call.**
-6. Open **Wallet**. Leave the amount at **$10**. Click **Add credit**. The message is `Dev stub added $10 of calling credit.` The balance line reads `Balance: $10.0000`.
-7. Open **Numbers**. Leave country on **United States**. Type `555` in the digits box. Click **Search**.
-8. On a `+1 … 555 …` row (`$5.0000/mo` for the sample and the dev seed), click **Pay from balance**. The number moves to **My numbers** with status `active`. The balance drops by that monthly price.
+3. You are on **Numbers**. No card step. Search an area code, pick a row, confirm a phone such as `+15555550199` (code in `[otp:sms]`), then **Pay by card**.
+4. **My numbers** shows **Active**, auto-renew on, renew date about 30 days out. Turning auto-renew off keeps the number until that date.
+5. Open **Wallet** and **Add calling credit**. That balance is only for calls. The Dialer shows **Calling credit** and a short status such as **Ready** or **Can't connect**.
 
-**Subscribe by card** on the same row also stays on the stub: it reserves the number and posts `checkout.session.completed` with `kind: did_subscription`. Use **Pay from balance** for the prepaid path above.
-
-Calls still do not connect. There is no SIPNAV edge in this test.
+The card subscription posts `checkout.session.completed` with `kind: did_subscription`. A card on file is not required before you can browse. Calls still do not connect without the edge.
 
 ## 3. The same steps as API calls
 

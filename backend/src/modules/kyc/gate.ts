@@ -1,7 +1,8 @@
 /**
- * KYC gate (Umar-approved rule): KYC must pass BEFORE a user can buy a DID or place any call.
- * Minimum: email OTP + phone OTP + verified payment method.
- * Extra: ID document and/or address wherever the DID country requires it.
+ * Identity gate before a number purchase or a call: email OTP + phone OTP.
+ * A card is not collected at signup. The number is a separate 30-day payment, and
+ * calling credit is a separate wallet top-up. ID and/or address still apply when
+ * the DID country requires them.
  */
 export type KycCheckType = 'email' | 'phone' | 'payment_method' | 'id_document' | 'address';
 export type KycStatus = 'pending' | 'passed' | 'failed';
@@ -28,7 +29,7 @@ export interface KycDecision {
   failed: KycCheckType[];
 }
 
-export const BASE_REQUIREMENTS: readonly KycCheckType[] = ['email', 'phone', 'payment_method'];
+export const BASE_REQUIREMENTS: readonly KycCheckType[] = ['email', 'phone'];
 
 /** Latest check per type wins (a later 'failed' revokes an earlier 'passed'). */
 export function latestByType(checks: readonly KycCheck[]): Map<KycCheckType, KycCheck> {

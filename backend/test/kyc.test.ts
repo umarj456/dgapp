@@ -5,7 +5,7 @@ import { requireKyc } from '../src/modules/kyc/middleware.js';
 
 const t = (n: number) => new Date(2026, 0, 1, 0, 0, n);
 const pass = (checkType: KycCheck['checkType'], n = 1, country?: string): KycCheck => ({ checkType, status: 'passed', createdAt: t(n), country });
-const base = [pass('email'), pass('phone'), pass('payment_method')];
+const base = [pass('email'), pass('phone')];
 const DE: CountryRequirement = { country: 'DE', requiresId: true, requiresAddress: true, addressMustBeLocal: true };
 const GB: CountryRequirement = { country: 'GB', requiresId: false, requiresAddress: true, addressMustBeLocal: false };
 
@@ -13,11 +13,11 @@ describe('KYC gate rules', () => {
   it('new user can do nothing', () => {
     const d = evaluateKyc([], 'place_call');
     expect(d.allowed).toBe(false);
-    expect(d.missing).toEqual(['email', 'phone', 'payment_method']);
+    expect(d.missing).toEqual(['email', 'phone']);
   });
-  it('email + phone without payment method is not enough to call or buy', () => {
-    expect(evaluateKyc([pass('email'), pass('phone')], 'place_call')).toMatchObject({ allowed: false, missing: ['payment_method'] });
-    expect(evaluateKyc([pass('email'), pass('phone')], 'buy_did')).toMatchObject({ allowed: false, missing: ['payment_method'] });
+  it('email + phone is enough to call and to buy a US number', () => {
+    expect(evaluateKyc([pass('email'), pass('phone')], 'place_call').allowed).toBe(true);
+    expect(evaluateKyc([pass('email'), pass('phone')], 'buy_did', { country: 'US', requiresId: false, requiresAddress: false, addressMustBeLocal: false }).allowed).toBe(true);
   });
   it('base checks allow calls and US numbers', () => {
     expect(evaluateKyc(base, 'place_call').allowed).toBe(true);
@@ -32,11 +32,11 @@ describe('KYC gate rules', () => {
     expect(evaluateKyc([...base, pass('address', 2, 'PK')], 'buy_did', GB).allowed).toBe(true);
   });
   it('pending counts as missing; latest result wins', () => {
-    const pending: KycCheck = { checkType: 'payment_method', status: 'pending', createdAt: t(5) };
-    expect(evaluateKyc([pass('email'), pass('phone'), pending], 'place_call').missing).toEqual(['payment_method']);
-    const revoked: KycCheck = { checkType: 'payment_method', status: 'failed', createdAt: t(9) };
-    expect(evaluateKyc([...base, revoked], 'place_call')).toMatchObject({ allowed: false, failed: ['payment_method'] });
-    expect(evaluateKyc([...base, revoked, pass('payment_method', 10)], 'place_call').allowed).toBe(true);
+    const pending: KycCheck = { checkType: 'phone', status: 'pending', createdAt: t(5) };
+    expect(evaluateKyc([pass('email'), pending], 'place_call').missing).toEqual(['phone']);
+    const revoked: KycCheck = { checkType: 'phone', status: 'failed', createdAt: t(9) };
+    expect(evaluateKyc([pass('email'), pass('phone'), revoked], 'place_call')).toMatchObject({ allowed: false, failed: ['phone'] });
+    expect(evaluateKyc([pass('email'), revoked, pass('phone', 10)], 'place_call').allowed).toBe(true);
   });
 });
 
@@ -57,7 +57,7 @@ describe('KYC gate middleware', () => {
     const app = await appWith([pass('email')]);
     const res = await app.inject({ method: 'POST', url: '/call', headers: { 'x-user': '1' } });
     expect(res.statusCode).toBe(403);
-    expect(res.json()).toMatchObject({ error: 'kyc_required', missing: ['phone', 'payment_method'] });
+    expect(res.json()).toMatchObject({ error: 'kyc_required', missing: ['phone'] });
   });
   it('applies the DID country requirement on buy', async () => {
     const app = await appWith(base, DE);

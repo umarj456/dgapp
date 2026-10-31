@@ -30,8 +30,8 @@ export async function createTopupCheckout(userId: string, customerId: string | n
     line_items: [{ price_data: { currency: 'usd', unit_amount: cents, product_data: { name: 'DG App calling credit' } }, quantity: 1 }],
     metadata: { kind: 'topup', user_id: userId, amount_micros: String(amountMicros) },
     payment_intent_data: { setup_future_usage: 'off_session' },
-    success_url: `${config.WEB_ORIGIN}/wallet?topup=ok`,
-    cancel_url: `${config.WEB_ORIGIN}/wallet?topup=cancel`,
+    success_url: `${config.WEB_ORIGIN}/?topup=ok`,
+    cancel_url: `${config.WEB_ORIGIN}/?topup=cancel`,
   });
   return { id: session.id, url: session.url!, stub: false };
 }
@@ -49,13 +49,13 @@ export async function createDidSubscriptionCheckout(
     mode: 'subscription',
     customer: customerId ?? undefined,
     line_items: [{
-      price_data: { currency: 'usd', unit_amount: cents, recurring: { interval: 'month' }, product_data: { name: `Phone number +${e164}` } },
+      price_data: { currency: 'usd', unit_amount: cents, recurring: { interval: 'day', interval_count: 30 }, product_data: { name: `Phone number +${e164}` } },
       quantity: 1,
     }],
     metadata: { kind: 'did_subscription', user_id: userId, assignment_id: assignmentId },
     subscription_data: { metadata: { kind: 'did_subscription', user_id: userId, assignment_id: assignmentId } },
-    success_url: `${config.WEB_ORIGIN}/numbers?buy=ok`,
-    cancel_url: `${config.WEB_ORIGIN}/numbers?buy=cancel`,
+    success_url: `${config.WEB_ORIGIN}/?buy=ok`,
+    cancel_url: `${config.WEB_ORIGIN}/?buy=cancel`,
   });
   return { id: session.id, url: session.url!, stub: false };
 }
